@@ -1,0 +1,27 @@
+________                           ________                         .___
+\_____  \ ______   ____   ____    /  _____/______   ____   ____   __| _/__.__.
+ /   |   \\____ \_/ __ \ /    \  /   \  __\_  __ \_/ __ \_/ __ \ / __ <   |  |
+/    |    \  |_> >  ___/|   |  \ \    \_\  \  | \/\  ___/\  ___// /_/ |\___  |
+\_______  /   __/ \___  >___|  /  \______  /__|    \___  >\___  >____ |/ ____|
+        \/|__|        \/     \/          \/            \/     \/     \/\/
+
+	  An open-source implementation of Edromel Studio's Greedy XP
+
+			Copyright (C) 2014 Arnaud TROEL
+
+
+This program is free software: you are free to redistribute it and/or modify it
+under the terms of the GNU General Public License version 2 or later.
+
+
+   This program is a rewrite from scratch of Greedy XP. Original authors are:
+
+			    Marc RADERMACHER (code)
+			   Patrick LACHAUX (graphics)
+			   Christophe RESIGNE (music)
+
+		This program relies on the following libraries:
+		   SDL, SDL_mixer, OpenGL, Coremod and zlib.
+
+     Binaries and data can be downloaded from http://troel.net/open_greedy
+	Source code is available at http://github.com/atroel/open-greedy
