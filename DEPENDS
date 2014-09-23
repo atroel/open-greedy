@@ -1,0 +1,55 @@
+Open Greedy has the following dependencies:
+
+
+Dynamic linking is required with the following libraries:
+
+SDL - http://www.libsdl.org/
+Version: 2.0.3
+License: zlib
+
+SDL mixer - http://www.libsdl.org/projects/SDL_mixer/
+Version: 2.0.0
+License: zlib
+
+zlib - http://www.zlib.net/
+Version: 1.2.8
+License: zlib
+
+OpenGL - http://www.opengl.org/
+Version: 1.0
+
+
+Static linking is required with the following libraries:
+
+Coremod - http://github.com/cmatsuoka/coremod/
+Version: 4.2.7
+License: MIT (Expat)
+
+Basics - http://savannah.nongnu.org/project/basics/
+Version: 0.1
+License: 2-clause BSD
+
+
+Building for Linux
+
+Open Greedy can be built under Linux using GCC and GNU Make.
+
+Adapt Build.mk to specify where Coremod and Basics can be found unless they are
+at the same level as Open Greedy source tree.
+
+To build, run:
+$ make
+
+
+Building for Windows
+
+Open Greedy can be built under Windows using MinGW and GNU Make.
+
+Adapt Build.mk to specify where Coremod and Basics can be found unless they are
+at the same level as Open Greedy source tree.
+
+Install SDL and SDL mixer for Windows at the same level as Open Greedy source
+tree (or adapt Build-Win32.mk accordingly).
+
+To build, run:
+$ make B=Win32
