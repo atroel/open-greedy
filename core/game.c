@@ -900,11 +900,9 @@ static int init_level(struct game *self, int n)
 	int error = open_level(&self->level, &self->layout);
 	if (error) {
 		struct ofstream ofs;
-		struct layout_debug_ostream los;
 		log_w("skipping rejected layout #%d: %d", n, error);
 		initialize_ofstream_with_fp(&ofs, stderr, 0);
-		initialize_layout_debug_ostream(&los, &ofs.ostream);
-		serialize_layout(&self->layout, &los.ostream);
+		print_layout(&self->layout, &ofs.ostream);
 		finalize_ofstream(&ofs);
 	} else
 		self->n = n;

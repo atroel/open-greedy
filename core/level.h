@@ -56,36 +56,13 @@ static inline int get_layout(const struct layout *l, int x, int y)
 	return l->data[x][y];
 }
 
-static inline int serialize_layout(const struct layout *l, struct ostream *s)
-{
-	if (write_ostream(s, l->data, sizeof(l->data)) < sizeof(l->data))
-		return -1;
-	return 0;
-}
+extern int serialize_layout(const struct layout *l, struct ostream *s);
 
-static inline int unserialize_layout(struct layout *l, struct istream *s)
-{
-	if (read_istream(s, l->data, sizeof(l->data)) < sizeof(l->data))
-		return -1;
-	return 0;
-}
+extern int unserialize_layout(struct layout *l, struct istream *s);
 
-struct layout_debug_ostream {
-	struct ostream ostream;
-	unsigned short int x, y;
-	struct ostream *o;
-};
+extern int print_layout(const struct layout *l, struct ostream *s);
 
-extern const struct ostream_ops __layout_debug_ostream_ops;
-
-static inline void initialize_layout_debug_ostream(
-	struct layout_debug_ostream *s, struct ostream* o)
-{
-	s->ostream.ops = &__layout_debug_ostream_ops;
-	s->x = 0;
-	s->y = 0;
-	s->o = o;
-}
+extern int parse_layout(struct layout *l, struct istream *s);
 
 struct mobile;
 struct pacman;

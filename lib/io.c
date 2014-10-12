@@ -864,3 +864,29 @@ int initialize_ioring(struct ioring *self)
 	return 0;
 }
 
+long long int pipe_streams(struct istream *i, struct ostream *o)
+{
+	char buf[4096], *ptr;
+	long long int size = 0;
+	for (;;) {
+		long long int rsize = read_istream(i, buf, sizeof(buf));
+		if (rsize < 0) {
+			log_e("i/o read error #%lld", rsize);
+			return rsize;
+		}
+		if (!rsize)
+			break;
+		ptr = buf;
+		while (rsize) {
+			long long int wsize = write_ostream(o, ptr, rsize);
+			if (wsize < 0) {
+				log_e("i/o write error #%lld", wsize);
+				return wsize;
+			}
+			rsize -= wsize;
+			ptr += wsize;
+			size += wsize;
+		}
+	}
+	return size;
+}

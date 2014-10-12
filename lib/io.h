@@ -104,6 +104,8 @@ static inline void finalize_ostream(struct ostream *s)
 	flush_ostream(s);
 }
 
+extern long long int pipe_streams(struct istream *i, struct ostream *o);
+
 struct ifstream {
 	struct istream istream;
 	void *fp;

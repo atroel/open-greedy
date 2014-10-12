@@ -68,6 +68,88 @@ b6_flag(game, string);
 static const char *log_flag = NULL;
 b6_flag_named(log_flag, string, "log");
 
+/* ascii to lev */
+static int a2l(struct b6_cmd *b6_cmd, int argc, char *argv[])
+{
+	struct layout layout;
+	struct ifstream ifs;
+	struct ofstream ofs;
+	int retval;
+	initialize_ifstream_with_fp(&ifs, stdin, 0);
+	retval = parse_layout(&layout, &ifs.istream);
+	finalize_ifstream(&ifs);
+	if (retval)
+		return EXIT_FAILURE;
+	initialize_ofstream_with_fp(&ofs, stdout, 0);
+	retval = serialize_layout(&layout, &ofs.ostream);
+	finalize_ofstream(&ofs);
+	if (retval)
+		return EXIT_FAILURE;
+	return EXIT_SUCCESS;
+}
+b6_cmd(a2l);
+
+/* lev to ascii */
+static int l2a(struct b6_cmd *cmd, int argc, char *argv[])
+{
+	struct layout layout;
+	struct ifstream ifs;
+	struct ofstream ofs;
+	int retval;
+	initialize_ifstream_with_fp(&ifs, stdin, 0);
+	retval = unserialize_layout(&layout, &ifs.istream);
+	finalize_ifstream(&ifs);
+	if (retval)
+		return EXIT_FAILURE;
+	initialize_ofstream_with_fp(&ofs, stdout, 0);
+	retval = print_layout(&layout, &ofs.ostream);
+	finalize_ofstream(&ofs);
+	if (retval)
+		return EXIT_FAILURE;
+	return EXIT_SUCCESS;
+}
+b6_cmd(l2a);
+
+/* data to z */
+static int d2z(struct b6_cmd *cmd, int argc, char *argv[])
+{
+	unsigned char zbuf[4096];
+	struct ifstream ifs;
+	struct ofstream ofs;
+	struct ozstream ozs;
+	int retval = EXIT_FAILURE;
+	initialize_ifstream_with_fp(&ifs, stdin, 0);
+	initialize_ofstream_with_fp(&ofs, stdout, 0);
+	if (!initialize_ozstream(&ozs, &ofs.ostream, zbuf, sizeof(zbuf)) &&
+	    pipe_streams(&ifs.istream, &ozs.up) > 0)
+		retval = EXIT_SUCCESS;
+	finalize_ozstream(&ozs);
+	finalize_ofstream(&ofs);
+	finalize_ifstream(&ifs);
+	return retval;
+}
+b6_cmd(d2z);
+
+/* z to data */
+static int z2d(struct b6_cmd *cmd, int argc, char *argv[])
+{
+	unsigned char zbuf[4096];
+	struct ifstream ifs;
+	struct ofstream ofs;
+	struct izstream izs;
+	int retval = EXIT_FAILURE;
+	initialize_ofstream_with_fp(&ofs, stdout, 0);
+	initialize_ifstream_with_fp(&ifs, stdin, 0);
+	if (!initialize_izstream(&izs, &ifs.istream, zbuf, sizeof(zbuf)) &&
+	    pipe_streams(&izs.up, &ofs.ostream) > 0)
+		retval = EXIT_SUCCESS;
+	finalize_izstream(&izs);
+	finalize_ifstream(&ifs);
+	finalize_ofstream(&ofs);
+	return retval;
+}
+b6_cmd(z2d);
+
 int main(int argc, char *argv[])
 {
 	int retval = EXIT_FAILURE;
@@ -76,18 +158,10 @@ int main(int argc, char *argv[])
 	struct b6_named_clock *clock_source = NULL;
 	const struct game_config *game_config;
 	struct engine engine;
-	puts("Open Greedy - Copyright (C) 2014 Arnaud TROEL");
-	puts("This program comes with ABSOLUTELY NO WARRANTY.");
-	puts("This is free software, and you are welcome to redistribute it");
-	puts("under certain conditions; see COPYING file for details.");
-#ifdef VERSION
-	fputs("Version: " STRINGIFY(VERSION) "\n", stderr);
-#endif
-#ifdef BUILD
-	fputs("Build: " STRINGIFY(BUILD) "\n", stderr);
-#endif
+	struct b6_cmd *cmd;
+	int argn;
 	initialize_log();
-	b6_parse_command_line_flags(argc, argv, 0);
+	argn = b6_parse_command_line_flags(argc, argv, 0);
 	if (log_flag)
 		switch (*log_flag) {
 		case 'D': case 'd': log_level = LOG_DEBUG; break;
@@ -100,8 +174,22 @@ int main(int argc, char *argv[])
 		log_e("cannot find clock %s", clock_name);
 	if (!(clock_source = b6_get_default_named_clock()))
 		log_p("cannot find a default clock");
+	if (argn <= 0)
+		log_p("error parsing command line");
+	if (argn < argc && (cmd = b6_lookup_cmd(argv[argn])))
+		return b6_exec_cmd(cmd, argc - argn, argv + argn);
 	log_clock = clock_source->clock;
 	log_i("using %s clock source", clock_source->entry.name);
+	puts("Open Greedy - Copyright (C) 2014 Arnaud TROEL");
+	puts("This program comes with ABSOLUTELY NO WARRANTY.");
+	puts("This is free software, and you are welcome to redistribute it");
+	puts("under certain conditions; see COPYING file for details.");
+#ifdef VERSION
+	fputs("Version: " STRINGIFY(VERSION) "\n", stderr);
+#endif
+#ifdef BUILD
+	fputs("Build: " STRINGIFY(BUILD) "\n", stderr);
+#endif
 	init_all();
 	if (!(game_config = lookup_game_config(mode)))
 		log_p("unknown mode: %s", mode);

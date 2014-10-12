@@ -45,27 +45,96 @@ static char layout_to_char(int code)
 	return '?';
 }
 
-static long long int write_layout_debug(struct ostream *o, const void *b,
-					unsigned long long int n)
+int print_layout(const struct layout *layout, struct ostream *ostream)
 {
-	struct layout_debug_ostream *self =
-		b6_cast_of(o, struct layout_debug_ostream, ostream);
-	unsigned char buffer[LEVEL_HEIGHT + 2][LEVEL_WIDTH + 3];
-	const unsigned char *p;
 	int x, y;
-	for (p = b, x = 0; x < LEVEL_WIDTH + 2; x += 1)
-		for (y = 0; y < LEVEL_HEIGHT + 2; y += 1)
-			buffer[y][x] = layout_to_char(*p++);
-	for (y = 0; y < LEVEL_HEIGHT + 2; ++y)
-		buffer[y][LEVEL_WIDTH + 2] = '\n';
-	if (write_ostream(self->o, buffer, sizeof(buffer)) < sizeof(buffer))
-		return -1;
-	return n;
+	char ascii[LEVEL_WIDTH + 3];
+	long long int wsize;
+	ascii[LEVEL_WIDTH + 2] = '\n';
+	for (y = 0; y < LEVEL_HEIGHT + 2; y += 1) {
+		for (x = 0; x < LEVEL_WIDTH + 2; x += 1)
+			ascii[x] = layout_to_char(layout->data[x][y]);
+		wsize = write_ostream(ostream, ascii, sizeof(ascii));
+		if (wsize < 0) {
+			log_e("i/o error #%d", (int)wsize);
+			return -1;
+		}
+		if (wsize < sizeof(ascii)) {
+			log_e("truncated file");
+			return -1;
+		}
+	}
+	return 0;
 }
 
-const struct ostream_ops __layout_debug_ostream_ops = {
-	.write = write_layout_debug,
-};
+int serialize_layout(const struct layout *l, struct ostream *s)
+{
+	if (write_ostream(s, l->data, sizeof(l->data)) < sizeof(l->data))
+		return -1;
+	return 0;
+}
+
+static void frame_layout(struct layout *layout) {
+	int x, y;
+	for (x = 0; x < LEVEL_WIDTH + 2; x += 1) {
+		layout->data[x][0] = LAYOUT_WALL;
+		layout->data[x][LEVEL_HEIGHT + 1] = LAYOUT_WALL;
+	}
+	for (y = 1; y < LEVEL_HEIGHT + 1; y += 1) {
+		layout->data[LEVEL_WIDTH + 1][y] = LAYOUT_WALL;
+		layout->data[0][y] = LAYOUT_WALL;
+	}
+}
+
+static unsigned char char_to_layout(char c)
+{
+	switch (c) {
+	case '.': return LAYOUT_PAC_GUM_1;
+	case ',': return LAYOUT_PAC_GUM_2;
+	case '*': return LAYOUT_SUPER_PAC_GUM;
+	case 'b': return LAYOUT_BONUS;
+	case 'p': return LAYOUT_PACMAN;
+	case 'g': return LAYOUT_GHOSTS;
+	case ' ': return LAYOUT_EMPTY;
+	case 't': return LAYOUT_TELEPORT;
+	case '@':
+	default:
+		  return LAYOUT_WALL;
+	}
+}
+
+int parse_layout(struct layout *layout, struct istream *istream)
+{
+	int x, y;
+	char ascii[LEVEL_WIDTH + 2];
+	long long int rsize;
+	for (y = 0; y < LEVEL_HEIGHT + 2; y += 1) {
+		rsize = read_istream(istream, ascii, sizeof(ascii));
+		if (rsize < 0) {
+			log_e("i/o error #d", (int)rsize);
+			return -1;
+		}
+		if (rsize < sizeof(ascii)) {
+			log_e("truncated stream");
+			return -1;
+		}
+		for (x = 0; x < b6_card_of(ascii); x += 1)
+			layout->data[x][y] = char_to_layout(ascii[x]);
+		do
+			rsize = read_istream(istream, ascii, 1);
+		while (rsize > 0 && *ascii != '\n');
+	}
+	frame_layout(layout);
+	return 0;
+}
+
+int unserialize_layout(struct layout *l, struct istream *s)
+{
+	if (read_istream(s, l->data, sizeof(l->data)) < sizeof(l->data))
+		return -1;
+	frame_layout(l);
+	return 0;
+}
 
 static struct place *__get_place(struct level *l, int x, int y)
 {
