@@ -19,7 +19,7 @@
 
 #include "data.h"
 
-#include <b6/flags.h>
+#include <b6/cmdline.h>
 
 #include "lib/log.h"
 

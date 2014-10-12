@@ -30,7 +30,7 @@
 #include "data.h"
 
 #include <b6/clock.h>
-#include <b6/flags.h>
+#include <b6/cmdline.h>
 
 struct game_phase {
 	struct phase up;

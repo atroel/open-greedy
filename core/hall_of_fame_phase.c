@@ -33,7 +33,7 @@
 #include "toolkit.h"
 
 #include <b6/clock.h>
-#include <b6/flags.h>
+#include <b6/cmdline.h>
 
 static const char *hof_skin = NULL;
 b6_flag(hof_skin, string);

@@ -21,7 +21,7 @@
 #include "core/rgba.h"
 #include "lib/log.h"
 #include "lib/std.h"
-#include <b6/flags.h>
+#include <b6/cmdline.h>
 
 static int use_gl_ext = 1;
 b6_flag(use_gl_ext, bool);

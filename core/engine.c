@@ -24,6 +24,8 @@
 #include "level.h"
 #include "renderer.h"
 
+#include <b6/cmdline.h>
+
 B6_REGISTRY_DEFINE(__phase_registry);
 
 static const char *fallback = "default";

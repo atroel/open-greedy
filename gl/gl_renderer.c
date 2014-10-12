@@ -20,7 +20,7 @@
 #include "gl_renderer.h"
 
 #include <b6/array.h>
-#include <b6/flags.h>
+#include <b6/cmdline.h>
 #include <b6/pool.h>
 
 #include "core/renderer.h"

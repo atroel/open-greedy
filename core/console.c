@@ -19,7 +19,7 @@
 
 #include "console.h"
 
-#include <b6/flags.h>
+#include <b6/cmdline.h>
 
 static unsigned short int ws = 0;
 b6_flag(ws, ushort);

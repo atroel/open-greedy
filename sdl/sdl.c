@@ -24,7 +24,7 @@
 #include <xmp.h>
 #undef BUILDING_STATIC
 #include <b6/clock.h>
-#include <b6/flags.h>
+#include <b6/cmdline.h>
 #include <string.h>
 
 #include "core/console.h"

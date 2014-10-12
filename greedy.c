@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <b6/clock.h>
-#include <b6/flags.h>
+#include <b6/cmdline.h>
 #include "core/console.h"
 #include "core/mixer.h"
 #include "core/lang.h"

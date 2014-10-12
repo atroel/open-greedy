@@ -19,7 +19,7 @@
 
 
 #include <b6/clock.h>
-#include <b6/flags.h>
+#include <b6/cmdline.h>
 
 #include "lib/init.h"
 

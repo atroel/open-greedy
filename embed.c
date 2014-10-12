@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <b6/flags.h>
+#include <b6/cmdline.h>
 #include "lib/io.h"
 
 static void write_head(struct ostream *ostream)

@@ -25,7 +25,7 @@
 #include "lib/init.h"
 #include "lib/std.h"
 
-#include <b6/flags.h>
+#include <b6/cmdline.h>
 
 static int cheat = 0;
 b6_flag(cheat, bool);

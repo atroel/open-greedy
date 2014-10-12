@@ -26,7 +26,7 @@
 
 #include "lib/std.h"
 #include "b6/extra/test.h"
-#include "b6/flags.h"
+#include "b6/cmdline.h"
 
 static long long int crunch(unsigned short int bsize,
 			    const char *ibuf, size_t ilen,
