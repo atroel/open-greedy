@@ -27,9 +27,9 @@ BASICS:=$(abspath $(SROOT)/../basics)
 EXTRA_CFLAGS+=-I$(BASICS)/include
 EXTRA_LDFLAGS+=$(BASICS)/src/libb6.a
 
-COREMOD:=$(abspath $(SROOT)/../coremod)
-CFLAGS-greedy+=-I$(COREMOD)/include/coremod
-LDFLAGS-greedy+=$(COREMOD)/lib/libxmp-coremod.a
+XMP_LITE:=$(abspath $(SROOT)/../libxmp-lite)
+CFLAGS-greedy+=-I$(XMP_LITE)/include/libxmp-lite
+LDFLAGS-greedy+=$(XMP_LITE)/lib/libxmp-lite.a
 LDFLAGS-greedy+=-lm
 
 ifeq ("$(notdir $(RROOT))","dbg")

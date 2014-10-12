@@ -21,7 +21,7 @@ under the terms of the GNU General Public License version 2 or later.
 			   Christophe RESIGNE (music)
 
 		This program relies on the following libraries:
-		   SDL, SDL_mixer, OpenGL, Coremod and zlib.
+		 SDL, SDL_mixer, OpenGL, libxmp-lite and zlib.
 
      Binaries and data can be downloaded from http://troel.net/open_greedy
 	Source code is available at http://github.com/atroel/open-greedy

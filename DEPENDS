@@ -21,8 +21,8 @@ Version: 1.0
 
 Static linking is required with the following libraries:
 
-Coremod - http://github.com/cmatsuoka/coremod/
-Version: 4.2.7
+Extended module player library lite - http://xmp.sourceforge.net/
+Version: 4.3.0
 License: MIT (Expat)
 
 Basics - http://savannah.nongnu.org/project/basics/
@@ -34,7 +34,7 @@ Building for Linux
 
 Open Greedy can be built under Linux using GCC and GNU Make.
 
-Adapt Build.mk to specify where Coremod and Basics can be found unless they are
+Adapt Build.mk to specify where XMP-lite and Basics can be found unless they are
 at the same level as Open Greedy source tree.
 
 To build, run:
@@ -45,7 +45,7 @@ Building for Windows
 
 Open Greedy can be built under Windows using MinGW and GNU Make.
 
-Adapt Build.mk to specify where Coremod and Basics can be found unless they are
+Adapt Build.mk to specify where XMP-lite and Basics can be found unless they are
 at the same level as Open Greedy source tree.
 
 Install SDL and SDL mixer for Windows at the same level as Open Greedy source

@@ -86,7 +86,7 @@ const struct lang __lang_default = {
 			"",
 			"This program relies on the following libraries:",
 			"",
-			"SDL, SDL_mixer, OpenGL, Coremod and zlib",
+			"SDL, SDL_mixer, OpenGL, libxmp-lite and zlib",
 			"",
 			"",
 			""
@@ -159,7 +159,7 @@ register_lang(fr) = {
 			"",
 			"Ce programme repose sur les bibliotheques suivantes:",
 			"",
-			"SDL, SDL_mixer, OpenGL, Coremod and zlib",
+			"SDL, SDL_mixer, OpenGL, libxmp-lite et zlib",
 			"",
 			"",
 			""
