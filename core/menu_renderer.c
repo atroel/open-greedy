@@ -22,7 +22,6 @@
 #include <b6/allocator.h>
 #include <b6/clock.h>
 #include "lib/std.h"
-#include "lang.h"
 #include "menu_phase.h"
 #include "data.h"
 
@@ -336,27 +335,6 @@ static void menu_renderer_on_focus_out(struct menu_observer *observer)
 	hide_toolkit_label(&e->label[1]);
 }
 
-static void alloc_menu_renderer_entries(struct menu_renderer *self)
-{
-	struct menu_iterator iter;
-	setup_menu_iterator(&iter, self->menu);
-	while (menu_iterator_has_next(&iter)) {
-		struct menu_entry *entry = menu_iterator_next(&iter);
-		entry->cookie = b6_allocate(&b6_std_allocator,
-					    sizeof(struct menu_entry_renderer));
-	}
-}
-
-static void free_menu_renderer_entries(struct menu_renderer *self)
-{
-	struct menu_iterator iter;
-	setup_menu_iterator(&iter, self->menu);
-	while (menu_iterator_has_next(&iter)) {
-		struct menu_entry *entry = menu_iterator_next(&iter);
-		b6_deallocate(&b6_std_allocator, entry->cookie);
-	}
-}
-
 static int initialize_menu_renderer_entries(struct menu_renderer *self)
 {
 	float x = 320;
@@ -388,19 +366,52 @@ static void finalize_menu_renderer_entries(struct menu_renderer *self)
 
 void update_menu_renderer(struct menu_renderer *self)
 {
+	if (!self->menu)
+		return;
 	menu_renderer_on_focus_out(&self->menu_observer);
 	finalize_menu_renderer_entries(self);
 	initialize_menu_renderer_entries(self);
 	menu_renderer_on_focus_in(&self->menu_observer);
 }
 
+void open_menu_renderer(struct menu_renderer *self, struct menu *menu)
+{
+	static const struct menu_observer_ops menu_observer_ops = {
+		.on_focus_in = menu_renderer_on_focus_in,
+		.on_focus_out = menu_renderer_on_focus_out,
+	};
+	struct menu_iterator iter;
+	self->menu = menu;
+	setup_menu_iterator(&iter, menu);
+	while (menu_iterator_has_next(&iter)) {
+		struct menu_entry *entry = menu_iterator_next(&iter);
+		entry->cookie = b6_allocate(&b6_std_allocator,
+					    sizeof(struct menu_entry_renderer));
+	}
+	initialize_menu_renderer_entries(self);
+	setup_menu_observer(&self->menu_observer, &menu_observer_ops);
+	add_menu_observer(self->menu, &self->menu_observer);
+	menu_renderer_on_focus_in(&self->menu_observer);
+}
+
+void close_menu_renderer(struct menu_renderer *self)
+{
+	struct menu_iterator iter;
+	menu_renderer_on_focus_out(&self->menu_observer);
+	del_menu_observer(&self->menu_observer);
+	finalize_menu_renderer_entries(self);
+	setup_menu_iterator(&iter, self->menu);
+	while (menu_iterator_has_next(&iter)) {
+		struct menu_entry *entry = menu_iterator_next(&iter);
+		b6_deallocate(&b6_std_allocator, entry->cookie);
+	}
+	self->menu = NULL;
+}
+
 int initialize_menu_renderer(struct menu_renderer *self,
 			     struct renderer *renderer,
 			     const struct b6_clock *clock,
-			     struct menu *menu,
-			     const char *skin_id,
-			     const char *mode,
-			     const struct lang *lang)
+			     const char *skin_id)
 {
 	static const struct renderer_observer_ops h_renderer_observer_ops = {
 		.on_render = menu_renderer_image_on_render_h,
@@ -411,15 +422,10 @@ int initialize_menu_renderer(struct menu_renderer *self,
 	static const struct renderer_observer_ops renderer_observer_ops = {
 		.on_render = menu_renderer_on_render,
 	};
-	static const struct menu_observer_ops menu_observer_ops = {
-		.on_focus_in = menu_renderer_on_focus_in,
-		.on_focus_out = menu_renderer_on_focus_out,
-	};
 	struct renderer_base *root;
 	self->renderer = renderer;
 	self->clock = clock;
-	self->menu = menu;
-	self->lang = lang;
+	self->menu = NULL;
 	root = get_renderer_base(renderer);
 	if (make_font(&self->normal_font, skin_id, MENU_NORMAL_FONT_DATA_ID))
 		return -1;
@@ -440,25 +446,16 @@ int initialize_menu_renderer(struct menu_renderer *self,
 				       -100, 304, 100, 124, 100, 4e-4,
 				       skin_id, MENU_GHOST_DATA_ID,
 				       &h_renderer_observer_ops);
-	alloc_menu_renderer_entries(self);
-	initialize_menu_renderer_entries(self);
 	add_renderer_observer(self->renderer, setup_renderer_observer(
 			&self->renderer_observer,
 			"menu_renderer",
 			&renderer_observer_ops));
-	setup_menu_observer(&self->menu_observer, &menu_observer_ops);
-	add_menu_observer(self->menu, &self->menu_observer);
-	menu_renderer_on_focus_in(&self->menu_observer);
 	return 0;
 }
 
 void finalize_menu_renderer(struct menu_renderer *self)
 {
-	menu_renderer_on_focus_out(&self->menu_observer);
-	del_menu_observer(&self->menu_observer);
 	del_renderer_observer(&self->renderer_observer);
-	finalize_menu_renderer_entries(self);
-	free_menu_renderer_entries(self);
 	finalize_menu_renderer_image(&self->ghost);
 	finalize_menu_renderer_image(&self->pacman);
 	finalize_menu_renderer_image(&self->title);

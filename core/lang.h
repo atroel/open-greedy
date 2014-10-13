@@ -28,11 +28,24 @@ struct lang {
 	struct b6_entry entry;
 	struct {
 		const char *play;
+		const char *options;
 		const char *hof;
 		const char *credits;
 		const char *quit;
+		const char *game;
+		const char *shuffle_on;
+		const char *shuffle_off;
 		const char *mode_slow;
 		const char *mode_fast;
+		const char *game_options;
+		const char *video_options;
+		const char *lang;
+		const char *fullscreen_on;
+		const char *fullscreen_off;
+		const char *vsync_on;
+		const char *vsync_off;
+		const char *apply;
+		const char *back;
 	} menu;
 	struct {
 		const char *get_ready;
@@ -68,21 +81,28 @@ struct lang {
 };
 
 #define register_lang(_self) \
-	static struct lang _self; \
 	static int register_lang_ ## _self(void) \
 	{ \
 		return b6_register(&__lang_registry, &(_self).entry, #_self); \
 	} \
-	register_init(register_lang_ ## _self); \
-	static struct lang _self
+	register_init(register_lang_ ## _self)
 
-extern const struct lang __lang_default;
+extern const struct lang *__lang_default;
 extern struct b6_registry __lang_registry;
 
 static inline const struct lang *lookup_lang(const char *name)
 {
 	const struct b6_entry *e = b6_lookup_registry(&__lang_registry, name);
-	return e ? b6_cast_of(e, const struct lang, entry) : &__lang_default;
+	return e ? b6_cast_of(e, const struct lang, entry) : __lang_default;
+}
+
+static inline const struct lang *get_next_lang(const struct lang *lang)
+{
+	struct b6_entry *entry;
+	entry = b6_walk_registry(&__lang_registry, &lang->entry, B6_NEXT);
+	if (!entry)
+		entry = b6_get_first_entry(&__lang_registry);
+	return b6_cast_of(entry, struct lang, entry);
 }
 
 #endif /* LANG_H */

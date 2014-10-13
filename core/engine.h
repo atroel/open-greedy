@@ -66,9 +66,9 @@ struct phase_ops {
 };
 
 extern void setup_engine(struct engine *self, const struct b6_clock *clock,
-			 struct console *console, struct mixer *mixer,
-			 const struct lang *lang,
-			 const struct game_config *game_config);
+			 struct console *console, struct mixer *mixer);
+
+extern void reset_engine(struct engine *self);
 
 extern void run_engine(struct engine*);
 

@@ -87,12 +87,29 @@ struct game_config {
 
 extern struct b6_registry __game_config_registry;
 
+static inline const struct game_config *get_default_game_config(void)
+{
+	struct b6_entry *entry = b6_get_first_entry(&__game_config_registry);
+	b6_check(entry);
+	return b6_cast_of(entry, struct game_config, entry);
+}
+
 static inline const struct game_config *lookup_game_config(const char *name)
 {
 	struct b6_entry *e = b6_lookup_registry(&__game_config_registry, name);
 	if (!e)
 		return NULL;
 	return b6_cast_of(e, struct game_config, entry);
+}
+
+static inline const struct game_config *get_next_game_config(
+	const struct game_config *self)
+{
+	struct b6_entry *entry = b6_walk_registry(&__game_config_registry,
+						  &self->entry, B6_NEXT);
+	if (!entry)
+		entry = b6_get_first_entry(&__game_config_registry);
+	return b6_cast_of(entry, struct game_config, entry);
 }
 
 struct game_casino {

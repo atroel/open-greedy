@@ -21,6 +21,7 @@
 #include "data.h"
 #include "engine.h"
 #include "game.h"
+#include "lang.h"
 #include "level.h"
 #include "renderer.h"
 
@@ -32,17 +33,21 @@ b6_flag(game, string);
 static int shuffle = 0;
 b6_flag(shuffle, bool);
 
+static const char *mode = "fast";
+b6_flag(mode, string);
+
+const char *lang = "en";
+b6_flag(lang, string);
+
 B6_REGISTRY_DEFINE(__phase_registry);
 
 void setup_engine(struct engine *self, const struct b6_clock *clock,
-		  struct console *console, struct mixer *mixer,
-		  const struct lang *lang,
-		  const struct game_config *game_config)
+		  struct console *console, struct mixer *mixer)
 {
 	self->clock = clock;
 	self->console = console;
 	self->mixer = mixer;
-	self->lang = lang;
+	self->lang = lookup_lang(lang);
 	if (!(self->layout_provider = lookup_layout_provider(game))) {
 		self->layout_provider = get_default_layout_provider();
 		b6_check(self->layout_provider);
@@ -50,9 +55,21 @@ void setup_engine(struct engine *self, const struct b6_clock *clock,
 		      self->layout_provider->entry.name);
 	}
 	self->shuffle = shuffle;
-	self->game_config = game_config;
+	if (!(self->game_config = lookup_game_config(mode))) {
+		log_w("unknown mode: %s", mode);
+		self->game_config = get_default_game_config();
+		log_w("falling back to: %s", self->game_config->entry.name);
+	}
 	self->game_result.score = 0ULL;
 	self->game_result.level = 0ULL;
+}
+
+void reset_engine(struct engine *self)
+{
+	stop_renderer(self->console->default_renderer);
+	close_console(self->console);
+	open_console(self->console);
+	start_renderer(self->console->default_renderer, 640, 480);
 }
 
 void run_engine(struct engine *self)

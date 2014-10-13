@@ -21,14 +21,27 @@
 
 B6_REGISTRY_DEFINE(__lang_registry);
 
-const struct lang __lang_default = {
+static struct lang en = {
 	.menu = {
 		.play = "Play",
+		.options = "Options",
 		.hof = "Hiscores",
 		.credits = "Credits",
 		.quit = "Quit",
-		.mode_slow = "Mode: slow",
-		.mode_fast = "Mode: fast",
+		.game_options = "Game options",
+		.video_options = "Video options",
+		.lang = "Language: English",
+		.fullscreen_on = "Mode: fullscreen",
+		.fullscreen_off = "Mode: windowed",
+		.vsync_on = "Vertical sync: on",
+		.vsync_off = "Vertical sync: off",
+		.apply = "Apply",
+		.back = "Back",
+		.game = "Levels: ",
+		.shuffle_on = "Order: random",
+		.shuffle_off = "Order: normal",
+		.mode_slow = "Speed: slow",
+		.mode_fast = "Speed: fast",
 	},
 	.game = {
 		.get_ready      = "GET READY!",
@@ -93,15 +106,31 @@ const struct lang __lang_default = {
 		},
 	},
 };
+register_lang(en);
 
-register_lang(fr) = {
+const struct lang *__lang_default = &en;
+
+static struct lang fr = {
 	.menu = {
 		.play = "Jouer",
+		.options = "Options",
 		.hof = "Meilleurs scores",
 		.credits = "Credits",
 		.quit = "Quitter",
-		.mode_slow = "Mode: lent",
-		.mode_fast = "Mode: rapide",
+		.game_options = "Options de jeu",
+		.video_options = "Options videos",
+		.lang = "Langue: Francais",
+		.fullscreen_on = "Mode: plein ecran",
+		.fullscreen_off = "Mode: fenetre",
+		.vsync_on = "Synchro verticale: on",
+		.vsync_off = "Synchro verticale: off",
+		.apply = "Appliquer",
+		.back = "Retour",
+		.game = "Niveaux: ",
+		.shuffle_on =  "Ordre: hasard",
+		.shuffle_off = "Ordre: normal",
+		.mode_slow = "Vitesse: lente ",
+		.mode_fast = "Vitesse: rapide",
 	},
 	.game = {
 		.get_ready      = "PRET?",
@@ -166,3 +195,4 @@ register_lang(fr) = {
 		},
 	},
 };
+register_lang(fr);

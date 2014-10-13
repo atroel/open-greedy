@@ -42,4 +42,6 @@ B6_REGISTRY_DEFINE(__console_registry);
 unsigned short int get_console_width() { return ws; }
 unsigned short int get_console_height() { return hs; }
 int get_console_fullscreen() { return fs; }
+void set_console_fullscreen(int value) { fs = !!value; }
 int get_console_vsync() { return vs; }
+void set_console_vsync(int value) { vs = !!value; }

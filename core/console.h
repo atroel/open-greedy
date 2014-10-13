@@ -39,7 +39,9 @@ struct console_ops {
 extern unsigned short int get_console_width();
 extern unsigned short int get_console_height();
 extern int get_console_fullscreen();
+extern void set_console_fullscreen(int);
 extern int get_console_vsync();
+extern void set_console_vsync(int);
 
 static inline int open_console(struct console *self)
 {

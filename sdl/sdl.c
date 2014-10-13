@@ -91,11 +91,6 @@ static int initialize_sdl_video()
 		log_e("%s", SDL_GetError());
 		return -1;
 	}
-	if (get_console_fullscreen()) {
-		SDL_ShowCursor(SDL_DISABLE);
-		flags |= SDL_WINDOW_FULLSCREEN;
-	} else
-		flags &= ~SDL_WINDOW_FULLSCREEN;
 	return 0;
 }
 
@@ -114,6 +109,11 @@ static int set_sdl_video_size(unsigned short int w, unsigned short int h)
 {
 	if (window)
 		SDL_DestroyWindow(window);
+	if (get_console_fullscreen()) {
+		SDL_ShowCursor(SDL_DISABLE);
+		flags |= SDL_WINDOW_FULLSCREEN;
+	} else
+		flags &= ~SDL_WINDOW_FULLSCREEN;
 	if (!w || !h) {
 		w = 640;
 		h = 480;

@@ -25,8 +25,6 @@
 #include "toolkit.h"
 #include "renderer.h"
 
-struct lang;
-
 struct menu_entry_renderer {
 	struct renderer_observer renderer_observer;
 	const struct b6_clock *clock;
@@ -46,7 +44,6 @@ struct menu_renderer {
 	struct menu_observer menu_observer;
 	struct renderer *renderer;
 	const struct b6_clock *clock;
-	const struct lang *lang;
 	struct menu *menu;
 	struct fixed_font normal_font;
 	struct fixed_font bright_font;
@@ -59,12 +56,13 @@ struct menu_renderer {
 extern int initialize_menu_renderer(struct menu_renderer *self,
 				    struct renderer *renderer,
 				    const struct b6_clock *clock,
-				    struct menu *menu,
-				    const char *skin_id,
-				    const char *mode,
-				    const struct lang *lang);
+				    const char *skin_id);
 
 extern void finalize_menu_renderer(struct menu_renderer *self);
+
+extern void open_menu_renderer(struct menu_renderer *self, struct menu *menu);
+
+extern void close_menu_renderer(struct menu_renderer *self);
 
 extern void update_menu_renderer(struct menu_renderer *self);
 

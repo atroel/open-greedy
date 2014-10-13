@@ -23,7 +23,6 @@
 #include <b6/cmdline.h>
 #include "core/console.h"
 #include "core/mixer.h"
-#include "core/lang.h"
 #include "core/engine.h"
 #include "core/game.h"
 #include "core/renderer.h"
@@ -55,12 +54,6 @@ b6_flag_named(clock_name, string, "clock");
 
 const char *console_name = "sdl/gl";
 b6_flag_named(console_name, string, "console");
-
-const char *lang = "en";
-b6_flag(lang, string);
-
-static const char *mode = "fast";
-b6_flag(mode, string);
 
 static const char *log_flag = NULL;
 b6_flag_named(log_flag, string, "log");
@@ -153,7 +146,6 @@ int main(int argc, char *argv[])
 	struct console *console = NULL;
 	struct mixer *mixer = NULL;
 	struct b6_named_clock *clock_source = NULL;
-	const struct game_config *game_config;
 	struct engine engine;
 	struct b6_cmd *cmd;
 	int argn;
@@ -188,8 +180,6 @@ int main(int argc, char *argv[])
 	fputs("Build: " STRINGIFY(BUILD) "\n", stderr);
 #endif
 	init_all();
-	if (!(game_config = lookup_game_config(mode)))
-		log_p("unknown mode: %s", mode);
 	if (!(console = lookup_console(console_name)))
 		log_p("unknown console: %s", console_name);
 	log_i("using %s console", console_name);
@@ -197,8 +187,7 @@ int main(int argc, char *argv[])
 	mixer = lookup_mixer("sdl");
 	if (open_mixer(mixer))
 		goto bail_out;
-	setup_engine(&engine, clock_source->clock, console, mixer,
-		     lookup_lang(lang), game_config);
+	setup_engine(&engine, clock_source->clock, console, mixer);
 	reset_random_number_generator(b6_get_clock_time(engine.clock));
 	run_engine(&engine);
 	retval = EXIT_SUCCESS;
