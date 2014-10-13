@@ -60,7 +60,7 @@ static int game_phase_init(struct phase *up, struct engine *engine)
 	b6_setup_cached_clock(&self->clock, engine->clock);
 	if ((retval = initialize_game(&self->game, &self->clock.up,
 				      engine->game_config,
-				      engine->level_data_name, level))) {
+				      get_engine_layouts(engine), level))) {
 		log_e("cannot initialize game (%d)", retval);
 		goto fail_game;
 	}

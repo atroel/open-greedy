@@ -21,10 +21,14 @@
 
 #include <b6/cmdline.h>
 
+#include "lib/rng.h"
 #include "lib/std.h"
 #include "lib/log.h"
+#include "data.h"
 #include "pacman.h"
 #include "items.h"
+
+B6_REGISTRY_DEFINE(__layout_provider_registry);
 
 static unsigned int ghost_den_recovery_radius = 2;
 b6_flag(ghost_den_recovery_radius, uint);
@@ -352,4 +356,81 @@ struct item *set_level_place_item(struct level *self, struct place *place,
 	dispose_item(old_item);
 	place->item = new_item;
 	return old_item;
+}
+
+static struct data_entry *lookup_data_layout(const char *name, unsigned int n)
+{
+	char level[] = "00";
+	level[0] += n / 10;
+	level[1] += n % 10;
+	return n > 99 ? NULL : lookup_data(name, level_data_type, level);
+}
+
+static int data_layout_provider_get(struct layout_provider *up, unsigned int n,
+				    struct layout *layout)
+{
+	struct data_layout_provider *self =
+		b6_cast_of(up, struct data_layout_provider, up);
+	struct data_entry *entry;
+	struct istream *istream;
+	int retval;
+	if (!(entry = lookup_data_layout(self->up.name, n))) {
+		log_w("could not find %s level #%d", up->name, n);
+		return -1;
+	}
+	if (!(istream = get_data(entry))) {
+		log_w("out of memory when reading %s level #%d", up->name, n);
+		return -1;
+	}
+	if ((retval = unserialize_layout(layout, istream)))
+		log_w("error %d when reading %s level #%d", up->name, retval,
+		      n);
+	put_data(entry, istream);
+	return retval;
+}
+
+int reset_data_layout_provider(struct data_layout_provider *self,
+			       const char *name)
+{
+	static const struct layout_provider_ops ops = {
+		.get = data_layout_provider_get,
+	};
+	unsigned int size;
+	for (size = 0; lookup_data_layout(name, size + 1); size += 1);
+	if (!size)
+		return -1;
+	reset_layout_provider(&self->up, &ops, name, size);
+	return 0;
+}
+
+static int layout_shuffler_get(struct layout_provider *up, unsigned int n,
+			       struct layout *layout)
+{
+	struct layout_shuffler *self =
+		b6_cast_of(up, struct layout_shuffler, up);
+	return get_layout_from_provider(self->layout_provider,
+					1 + self->index[n - 1], layout);
+}
+
+void reset_layout_shuffler(struct layout_shuffler *self,
+			   struct layout_provider *layout_provider)
+{
+	static const struct layout_provider_ops ops = {
+		.get = layout_shuffler_get,
+	};
+	unsigned int i;
+	reset_layout_provider(&self->up, &ops, layout_provider->name,
+			      layout_provider->size);
+	self->layout_provider = layout_provider;
+	for (i = 0; i < layout_provider->size; i += 1)
+		self->index[i] = i;
+	for (i = 0 ; i < 10000; i += 1) {
+		unsigned int a = read_random_number_generator() *
+			layout_provider->size;
+		unsigned int b = read_random_number_generator() *
+			layout_provider->size;
+		unsigned int index = self->index[a];
+		self->index[a] = self->index[b];
+		self->index[b] = index;
+	}
 }

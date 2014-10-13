@@ -909,27 +909,10 @@ static int init_level(struct game *self, int n)
 	return error;
 }
 
-static int load_level(struct game *self, int n)
+static int load_level(struct game *self, unsigned int n)
 {
-	char level[] = "00";
-	struct data_entry *entry;
-	struct istream *istream;
-	int retval;
-	level[0] += n / 10;
-	level[1] += n % 10;
-	if (!(entry = lookup_data(self->level_data_name, level_data_type,
-				  level))) {
-		log_w("could not find level #%d", n);
-		return -2;
-	}
-	if (!(istream = get_data(entry))) {
-		log_w("out of memory when reading level #%d", n);
-		return -1;
-	}
-	if ((retval = unserialize_layout(&self->layout, istream)))
-		log_w("error %d when reading level #%d", retval, n);
-	put_data(entry, istream);
-	return retval;
+	return get_layout_from_provider(self->layout_provider, n,
+					&self->layout);
 }
 
 static void startup(struct game *self)
@@ -1118,7 +1101,7 @@ static const struct game_ops leave_ops = {
 int initialize_game(struct game *self,
 		    const struct b6_clock *clock,
 		    const struct game_config *config,
-		    const char *level_data_name,
+		    struct layout_provider *layout_provider,
 		    unsigned int start_level)
 {
 	static const struct b6_event_ops bonus_enabled_ops = {
@@ -1260,7 +1243,7 @@ int initialize_game(struct game *self,
 			  config->pacman_speed, config->booster);
 	self->pacman.booster = config->booster;
 	self->hold = 0;
-	self->level_data_name = level_data_name;
+	self->layout_provider = layout_provider;
 	self->config = config;
 	self->extra_life_score = config->extra_life_score;
 	self->pacgum_score = config->pacgum_score;

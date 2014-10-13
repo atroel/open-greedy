@@ -26,37 +26,30 @@
 
 #include <b6/cmdline.h>
 
+static const char *game = "Greedy XP";
+b6_flag(game, string);
+
+static int shuffle = 0;
+b6_flag(shuffle, bool);
+
 B6_REGISTRY_DEFINE(__phase_registry);
-
-static const char *fallback = "default";
-
-static const char *probe_level_set(const char *level_data_name)
-{
-	struct data_entry *entry;
-	struct istream *istream;
-	if ((entry = lookup_data(level_data_name, level_data_type, "01")) &&
-	    (istream = get_data(entry))) {
-		struct layout layout;
-		int retval = unserialize_layout(&layout, istream);
-		put_data(entry, istream);
-		if (!retval)
-			return level_data_name;
-	}
-	log_e("level #01 of level set %s cannot be found or read. Falling back"
-	      "to %s level set.", level_data_name, fallback);
-	return fallback;
-}
 
 void setup_engine(struct engine *self, const struct b6_clock *clock,
 		  struct console *console, struct mixer *mixer,
-		  const struct lang *lang, const char* level_data_name,
+		  const struct lang *lang,
 		  const struct game_config *game_config)
 {
 	self->clock = clock;
 	self->console = console;
 	self->mixer = mixer;
 	self->lang = lang;
-	self->level_data_name = probe_level_set(level_data_name);
+	if (!(self->layout_provider = lookup_layout_provider(game))) {
+		self->layout_provider = get_default_layout_provider();
+		b6_check(self->layout_provider);
+		log_w("Could not find %s level set. Falling back to %s.", game,
+		      self->layout_provider->entry.name);
+	}
+	self->shuffle = shuffle;
 	self->game_config = game_config;
 	self->game_result.score = 0ULL;
 	self->game_result.level = 0ULL;
@@ -87,4 +80,16 @@ void run_engine(struct engine *self)
 		curr = next;
 	}
 	close_console(self->console);
+}
+
+struct layout_provider *get_engine_layouts(const struct engine *self)
+{
+	struct layout_provider *layout_provider = self->layout_provider;
+	if (self->shuffle) {
+		struct engine *mutable = (struct engine*)self;
+		reset_layout_shuffler(&mutable->layout_shuffler,
+				      layout_provider);
+		layout_provider = &mutable->layout_shuffler.up;
+	}
+	return layout_provider;
 }

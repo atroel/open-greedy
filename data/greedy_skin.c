@@ -305,6 +305,7 @@ register_exit(greedy_skin_dtor);
 
 static int greedy_skin_ctor(void)
 {
+	static struct data_layout_provider layout_provider;
 	int i, j, k;
 
 	register_greedy_level("01"); register_greedy_level("02");
@@ -346,6 +347,10 @@ static int greedy_skin_ctor(void)
 	register_greedy_level("73"); register_greedy_level("74");
 	register_greedy_level("75"); register_greedy_level("76");
 	register_greedy_level("77"); register_greedy_level("78");
+	if (reset_data_layout_provider(&layout_provider, "greedy"))
+		log_w("No levels: skipping registration.");
+	else if (register_layout_provider(&layout_provider.up, "Greedy XP"))
+		log_e("Could not register levels.");
 
 	greedy_image_resource(GREEDY_FONT, "font");
 	greedy_image_resource(GREEDY_GAME_PANEL, "game_panel");

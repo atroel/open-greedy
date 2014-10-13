@@ -62,9 +62,6 @@ b6_flag(lang, string);
 static const char *mode = "fast";
 b6_flag(mode, string);
 
-static const char *game = "greedy";
-b6_flag(game, string);
-
 static const char *log_flag = NULL;
 b6_flag_named(log_flag, string, "log");
 
@@ -201,7 +198,7 @@ int main(int argc, char *argv[])
 	if (open_mixer(mixer))
 		goto bail_out;
 	setup_engine(&engine, clock_source->clock, console, mixer,
-		     lookup_lang(lang), game, game_config);
+		     lookup_lang(lang), game_config);
 	reset_random_number_generator(b6_get_clock_time(engine.clock));
 	run_engine(&engine);
 	retval = EXIT_SUCCESS;

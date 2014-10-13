@@ -226,6 +226,13 @@ do { \
 			&data, membuf.buf, membuf.len, _name); \
 } while (0)
 
+static struct data_layout_provider default_layout_provider;
+
+struct layout_provider *get_default_layout_provider(void)
+{
+	return &default_layout_provider.up;
+}
+
 static int default_skin_ctor(void)
 {
 	static unsigned short int origin[] = { 0 };
@@ -386,6 +393,11 @@ static int default_skin_ctor(void)
 
 	register_embedded_data("default_level_01.lev",
 			       LEVEL_DATA_ID("default", "01"));
+	if (reset_data_layout_provider(&default_layout_provider, "default"))
+		log_p("Could initialize default levels.");
+	if (register_layout_provider(&default_layout_provider.up,
+				     "Open Greedy"))
+		log_p("Could not register levels.");
 
 	return 0;
 }

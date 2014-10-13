@@ -22,6 +22,7 @@
 
 #include <b6/registry.h>
 #include "core/console.h"
+#include "core/level.h"
 
 struct game_result {
 	unsigned long int level; /* final level in the game */
@@ -34,7 +35,9 @@ struct engine {
 	struct mixer *mixer;
 	const struct lang *lang;
 	const struct game_config *game_config;
-	const char *level_data_name;
+	struct layout_provider *layout_provider;
+	struct layout_shuffler layout_shuffler;
+	int shuffle;
 	struct game_result game_result;
 };
 
@@ -47,6 +50,8 @@ static inline struct renderer *get_engine_renderer(const struct engine *e)
 {
 	return e->console->default_renderer;
 }
+
+extern struct layout_provider *get_engine_layouts(const struct engine *e);
 
 struct phase {
 	struct b6_entry entry;
@@ -62,7 +67,7 @@ struct phase_ops {
 
 extern void setup_engine(struct engine *self, const struct b6_clock *clock,
 			 struct console *console, struct mixer *mixer,
-			 const struct lang *lang, const char *level_data_name,
+			 const struct lang *lang,
 			 const struct game_config *game_config);
 
 extern void run_engine(struct engine*);

@@ -111,7 +111,7 @@ struct game {
 	const struct game_ops *curr_ops;
 	const struct game_ops *next_ops;
 	struct b6_stopwatch stopwatch;
-	const char *level_data_name;
+	struct layout_provider *layout_provider;
 	struct layout layout;
 	struct items items;
 	struct level level;
@@ -236,7 +236,7 @@ static inline void del_game_observer(struct game_observer *o)
 extern int initialize_game(struct game *self,
 			   const struct b6_clock *clock,
 			   const struct game_config *config,
-			   const char* level_data_name,
+			   struct layout_provider *layout_provider,
 			   unsigned int start_level);
 
 extern void finalize_game(struct game *self);
