@@ -22,4 +22,6 @@ lib.a:=utils.o
 lib.a+=greedy_skin.o
 lib.a+=default_skin.o
 lib.a+=default_font.tga.data.o default_game.tga.data.o
-lib.a+=default_level_01.lev.data.o
+lib.a+=default_level_01.lev.data.o default_level_02.lev.data.o \
+	default_level_03.lev.data.o default_level_04.lev.data.o \
+	default_level_05.lev.data.o

@@ -186,7 +186,7 @@ do { \
 } while (0)
 
 #define register_embedded_data(path, name) \
-do {\
+do { \
 	static struct buffered_data_entry data; \
 	struct embedded *embedded; \
 	if ((embedded = lookup_embedded(path))) \
@@ -195,6 +195,10 @@ do {\
 	else \
 		log_e("embedded path not found: %s", path); \
 } while (0)
+
+#define register_embedded_level(num) \
+	register_embedded_data("default_level_" num ".lev", \
+			       LEVEL_DATA_ID("default", num))
 
 #define register_cached_image(path, name) \
 do { \
@@ -391,8 +395,11 @@ static int default_skin_ctor(void)
 		font_y[i] = (j / 32) * font_h;
 	}
 
-	register_embedded_data("default_level_01.lev",
-			       LEVEL_DATA_ID("default", "01"));
+	register_embedded_level("01");
+	register_embedded_level("02");
+	register_embedded_level("03");
+	register_embedded_level("04");
+	register_embedded_level("05");
 	if (reset_data_layout_provider(&default_layout_provider, "default"))
 		log_p("Could initialize default levels.");
 	if (register_layout_provider(&default_layout_provider.up,
