@@ -307,29 +307,32 @@ static void recover_ghosts_den(struct level *self, struct layout *layout)
 int __open_level(struct level *self, struct layout *layout)
 {
 	int i;
-	struct place* places[2];
 	for (i = 0; i < b6_card_of(self->places); i += 1) {
 		struct place *place = &self->places[i];
 		initialize_place(self, layout, place);
 		self->nplaces += !!place->item;
 	}
-	places[0] = self->items->teleport[0].place;
-	places[1] = self->items->teleport[1].place;
-	if (places[0] && places[1]) {
-		self->items->teleport[0].place = places[1];
-		self->items->teleport[1].place = places[0];
-		if (places[0]->item != &self->items->teleport[0].item)
+	self->teleport_places[0] = self->items->teleport[0].place;
+	self->teleport_places[1] = self->items->teleport[1].place;
+	if (self->teleport_places[0] && self->teleport_places[1]) {
+		self->items->teleport[0].place = self->teleport_places[1];
+		self->items->teleport[1].place = self->teleport_places[0];
+		if (self->teleport_places[0]->item !=
+		    &self->items->teleport[0].item)
 			dispose_item(&self->items->teleport[0].item);
-		if (places[1]->item != &self->items->teleport[1].item)
+		if (self->teleport_places[1]->item !=
+		    &self->items->teleport[1].item)
 			dispose_item(&self->items->teleport[1].item);
-	} else if (places[0]) {
+	} else if (self->teleport_places[0]) {
 		int x, y;
-		place_location(self, places[0], &x, &y);
+		place_location(self, self->teleport_places[0], &x, &y);
 		log_w("ignored single teleport at (%d,%d).", x, y);
-		dispose_item(places[0]->item);
-		places[0]->item = clone_empty(self->items);
+		dispose_item(self->teleport_places[0]->item);
+		self->teleport_places[0]->item = clone_empty(self->items);
+		self->teleport_places[0] = NULL;
 	}
-	b6_assert(!places[1] || (places[1] && places[0]));
+	b6_check(!self->teleport_places[1] ||
+		 (self->teleport_places[1] && self->teleport_places[0]));
 	recover_ghosts_den(self, layout);
 	if (self->pacman_home)
 		return 0;

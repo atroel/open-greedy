@@ -31,6 +31,7 @@ struct ghost_strategy {
 };
 
 struct ghost_strategy_ops {
+	void (*prepare)(struct ghost_strategy*, struct ghost*);
 	float (*evaluate)(struct ghost_strategy*, struct ghost*, struct place*);
 	void (*feedback)(struct ghost_strategy*, struct ghost*, enum direction);
 };
@@ -74,7 +75,10 @@ static struct ghost_strategy fallback_ghost_strategy;
 static void run_ghost_strategy(struct ghost_strategy *self, struct ghost *ghost)
 {
 	struct mobile *mobile = &ghost->mobile;
-	int i = get_best_scores(self, ghost);
+	int i;
+	if (self->ops->prepare)
+		self->ops->prepare(self, ghost);
+	i = get_best_scores(self, ghost);
 	if (i < 0 && get_ghost_state(ghost) != GHOST_ZOMBIE)
 		i = get_best_scores(&fallback_ghost_strategy, ghost);
 	if (self->ops->feedback)
@@ -196,6 +200,27 @@ static struct astar_node *place_to_node(struct place *place,
 	return coords_to_node(x, y, nodes);
 }
 
+static unsigned int get_shortest_distance(const struct level *level,
+					  int xs, int ys, int xd, int yd)
+{
+	unsigned int d = get_manhattan_distance(xs, ys, xd, yd);
+	if (level->teleport_places[0]) {
+		int x[2], y[2];
+		unsigned int dt[2];
+		place_location(level, level->teleport_places[0], &x[0], &y[0]);
+		place_location(level, level->teleport_places[1], &x[1], &y[1]);
+		dt[0] = get_manhattan_distance(xs, ys, x[0], y[0]) +
+			get_manhattan_distance(x[1], y[1], xd, yd);
+		dt[1] = get_manhattan_distance(xs, ys, x[1], y[1]) +
+			get_manhattan_distance(x[0], y[0], xd, yd);
+		if (d > dt[0])
+			d = dt[0];
+		if (d > dt[1])
+			d = dt[1];
+	}
+	return d;
+}
+
 static int get_astar_distance(struct level *level, const struct items *items,
 			      unsigned short int xs, unsigned short int ys,
 			      unsigned short int xd, unsigned short int yd)
@@ -215,7 +240,7 @@ static int get_astar_distance(struct level *level, const struct items *items,
 					       level));
 	goal = coords_to_node(xd, yd, nodes);
 	curr = coords_to_node(xs, ys, nodes);
-	open_astar_node(curr, 0, get_manhattan_distance(xs, ys, xd, yd));
+	open_astar_node(curr, 0, get_shortest_distance(level, xs, ys, xd, yd));
 	b6_heap_push(&queue, curr);
 	do {
 		struct place *place;
@@ -243,20 +268,20 @@ static int get_astar_distance(struct level *level, const struct items *items,
 			if (astar_node_is_closed(node) && g >= node->g)
 				continue;
 			if (!astar_node_is_open(node)) {
-				open_astar_node(node, g, get_manhattan_distance(
-						x, y, xd, yd));
+				open_astar_node(node, g, get_shortest_distance(
+						level, x, y, xd, yd));
 				b6_heap_push(&queue, node);
 				continue;
 			}
 			if (g >= node->g)
 				continue;
-			f = g + get_manhattan_distance(x, y, xd, yd);
+			f = g + get_shortest_distance(level, x, y, xd, yd);
 			if (node->f == f) {
 				node->g = g;
 				continue;
 			}
 			if (node->f < f) {
-				log_w("%u > %u", node->f, f);
+				log_w("%u < %u", node->f, f);
 				continue;
 			}
 			node->g = g;
@@ -268,48 +293,28 @@ static int get_astar_distance(struct level *level, const struct items *items,
 	return retval;
 }
 
-static struct ghost_strategy no_ghost_strategy;
-static struct janitor_strategy janitor_strategy;
-static struct ghost_strategy euclidian_ghost_strategy;
-static struct ghost_strategy manhattan_ghost_strategy;
-static struct ghost_strategy astar_ghost_strategy;
-static struct ghost_strategy zombie_ghost_strategy;
-static struct ghost_strategy afraid_ghost_strategy;
-
 static float get_no_score(struct ghost_strategy *self, struct ghost *ghost,
 			  struct place *place)
 {
 	return -1;
 }
 
-static float get_fallback_score(struct ghost_strategy *self, struct ghost *ghost,
-			      struct place *place)
+static float get_fallback_score(struct ghost_strategy *self,
+				struct ghost *ghost, struct place *place)
 {
 	return read_random_number_generator();
 }
 
-static float get_euclidian_score(struct ghost_strategy *self,
-				 struct ghost *ghost, struct place *place)
+static float get_doggy_score(struct ghost_strategy *self, struct ghost *ghost,
+			     struct place *place)
 {
-	float dx = self->game->pacman.mobile.x;
-	float dy = self->game->pacman.mobile.y;
-	int x, y;
-	place_location(ghost->mobile.level, place, &x, &y);
-	dx -= x;
-	dy -= y;
-	return 1 / (dx * dx + dy * dy);
-}
-
-static float get_manhattan_score(struct ghost_strategy *self,
-				 struct ghost *ghost, struct place *place)
-{
-	float dx = self->game->pacman.mobile.x;
-	float dy = self->game->pacman.mobile.y;
-	int x, y;
-	place_location(ghost->mobile.level, place, &x, &y);
-	dx -= x; if (dx < 0) dx = -dx;
-	dy -= y; if (dy < 0) dy = -dy;
-	return 1 / (dx + dy);
+	int xd = self->game->pacman.mobile.x;
+	int yd = self->game->pacman.mobile.y;
+	int xs, ys;
+	float d;
+	place_location(ghost->mobile.level, place, &xs, &ys);
+	d = get_shortest_distance(ghost->mobile.level, xs, ys, xd, yd);
+	return 1 / (1 + d);
 }
 
 static float get_astar_score(struct ghost_strategy *self, struct ghost *ghost,
@@ -340,44 +345,114 @@ static float get_zombie_score(struct ghost_strategy *self, struct ghost *ghost,
 	return d < 0 ? d : 1 - (1 + d) / LEVEL_WIDTH / LEVEL_HEIGHT;
 }
 
-static float get_afraid_score(struct ghost_strategy *self, struct ghost *ghost,
+struct rogue_strategy {
+	struct ghost_strategy up;
+	struct ghost_strategy none;
+	struct ghost_strategy doggy;
+	struct ghost_strategy astar;
+	struct ghost_strategy *strategy;
+};
+
+static void setup_no_strategy(struct ghost_strategy *self, struct game *game)
+{
+	static const struct ghost_strategy_ops ops = {
+		.evaluate = get_no_score,
+	};
+	setup_ghost_strategy(self, &ops, game);
+}
+
+static void setup_doggy_strategy(struct ghost_strategy *self, struct game *game)
+{
+	static const struct ghost_strategy_ops ops = {
+		.evaluate = get_doggy_score,
+	};
+	setup_ghost_strategy(self, &ops, game);
+}
+
+static void setup_astar_strategy(struct ghost_strategy *self, struct game *game)
+{
+	static const struct ghost_strategy_ops ops = {
+		.evaluate = get_astar_score,
+	};
+	setup_ghost_strategy(self, &ops, game);
+}
+
+static void prepare_rogue(struct ghost_strategy *up, struct ghost *ghost)
+{
+	struct rogue_strategy *self = b6_cast_of(up, struct rogue_strategy, up);
+	switch ((int)(read_random_number_generator() * 3)) {
+	case 0: self->strategy = &self->none; break;
+	case 1: self->strategy = &self->doggy; break;
+	default: self->strategy = &self->astar;
+	}
+	if (self->strategy->ops->prepare)
+		self->strategy->ops->prepare(self->strategy, ghost);
+}
+
+static float get_rogue_score(struct ghost_strategy *up, struct ghost *ghost,
+			     struct place *place)
+{
+	struct rogue_strategy *self = b6_cast_of(up, struct rogue_strategy, up);
+	b6_check(self->strategy);
+	return self->strategy->ops->evaluate(self->strategy, ghost, place);
+}
+
+static void setup_rogue_strategy(struct rogue_strategy *self, struct game *game)
+{
+	static const struct ghost_strategy_ops ops = {
+		.prepare = prepare_rogue,
+		.evaluate = get_rogue_score,
+	};
+	setup_no_strategy(&self->none, game);
+	setup_doggy_strategy(&self->doggy, game);
+	setup_astar_strategy(&self->astar, game);
+	setup_ghost_strategy(&self->up, &ops, game);
+}
+
+static float get_afraid_score(struct ghost_strategy *up, struct ghost *ghost,
 			      struct place *place)
 {
-	float f = get_astar_score(self, ghost, place);
+	float f = get_rogue_score(up, ghost, place);
 	return f < 0 ? f : 1 - f;
 }
+
+static void setup_afraid_strategy(struct rogue_strategy *self,
+				  struct game *game)
+{
+	static const struct ghost_strategy_ops ops = {
+		.prepare = prepare_rogue,
+		.evaluate = get_afraid_score,
+	};
+	setup_no_strategy(&self->none, game);
+	setup_doggy_strategy(&self->doggy, game);
+	setup_astar_strategy(&self->astar, game);
+	setup_ghost_strategy(&self->up, &ops, game);
+}
+
+static struct ghost_strategy no_ghost_strategy;
+static struct janitor_strategy janitor_strategy;
+static struct ghost_strategy doggy_ghost_strategy;
+static struct ghost_strategy astar_ghost_strategy;
+static struct ghost_strategy zombie_ghost_strategy;
+static struct rogue_strategy afraid_ghost_strategy;
+static struct rogue_strategy rogue_ghost_strategy;
 
 void initialize_ghost_strategies(struct game *game)
 {
 	static const struct ghost_strategy_ops zombie_ops = {
 		.evaluate = get_zombie_score,
 	};
-	static const struct ghost_strategy_ops no_ops = {
-		.evaluate = get_no_score,
-	};
 	static const struct ghost_strategy_ops fallback_ops = {
 		.evaluate = get_fallback_score,
-	};
-	static const struct ghost_strategy_ops euclidian_ops = {
-		.evaluate = get_euclidian_score,
-	};
-	static const struct ghost_strategy_ops manhattan_ops = {
-		.evaluate = get_manhattan_score,
-	};
-	static const struct ghost_strategy_ops astar_ops = {
-		.evaluate = get_astar_score,
-	};
-	static const struct ghost_strategy_ops afraid_ops = {
-		.evaluate = get_afraid_score,
 	};
 	setup_ghost_strategy(&zombie_ghost_strategy, &zombie_ops, game);
 	initialize_janitor_strategy(&janitor_strategy, game);
 	setup_ghost_strategy(&fallback_ghost_strategy, &fallback_ops, game);
-	setup_ghost_strategy(&no_ghost_strategy, &no_ops, game);
-	setup_ghost_strategy(&euclidian_ghost_strategy, &euclidian_ops, game);
-	setup_ghost_strategy(&manhattan_ghost_strategy, &manhattan_ops, game);
-	setup_ghost_strategy(&astar_ghost_strategy, &astar_ops, game);
-	setup_ghost_strategy(&afraid_ghost_strategy, &afraid_ops, game);
+	setup_no_strategy(&no_ghost_strategy, game);
+	setup_doggy_strategy(&doggy_ghost_strategy, game);
+	setup_astar_strategy(&astar_ghost_strategy, game);
+	setup_rogue_strategy(&rogue_ghost_strategy, game);
+	setup_afraid_strategy(&afraid_ghost_strategy, game);
 }
 
 static void ghost_enter(struct mobile *mobile)
@@ -394,13 +469,13 @@ void initialize_ghost(struct ghost *self, int n, float speed,
 	initialize_mobile(&self->mobile, &ops, clock, speed);
 	switch (n) {
 	case 0:
-		self->default_strategy = &no_ghost_strategy;
+		self->default_strategy = &doggy_ghost_strategy;
 		break;
 	case 1:
-		self->default_strategy = &euclidian_ghost_strategy;
+		self->default_strategy = &rogue_ghost_strategy.up;
 		break;
 	case 2:
-		self->default_strategy = &manhattan_ghost_strategy;
+		self->default_strategy = &rogue_ghost_strategy.up;
 		break;
 	default:
 		self->default_strategy = &astar_ghost_strategy;
@@ -434,7 +509,7 @@ void set_ghost_state(struct ghost *self, enum ghost_state state)
 			ghost_enter(mobile);
 		break;
 	case GHOST_AFRAID:
-		self->current_strategy = &afraid_ghost_strategy;
+		self->current_strategy = &afraid_ghost_strategy.up;
 		if (self->state == GHOST_HUNTER)
 			ghost_turns_around(self);
 		break;

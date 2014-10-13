@@ -173,6 +173,7 @@ struct level {
 	struct place *pacman_home;
 	struct place *ghosts_home;
 	struct place *bonus_place;
+	struct place *teleport_places[2];
 	struct place places[LEVEL_WIDTH*LEVEL_HEIGHT];
 	unsigned int nplaces;
 	struct items *items;
