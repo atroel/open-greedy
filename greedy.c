@@ -30,26 +30,9 @@
 #include "lib/log.h"
 #include "lib/rng.h"
 
-#define __STRINGIFY(s) #s
-#define STRINGIFY(s) __STRINGIFY(s)
+extern void install_crash_pad(void);
 
-#ifdef _WIN32
-#include <windows.h>
-static void BoostPrio(void)
-{
-	if (!SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS))
-		log_e("Setting priority class failed: %d", GetLastError());
-}
-#else
-static void BoostPrio(void) {}
-#endif /* _WIN32 */
-static void RevertPrio(void) {}
-
-#ifdef _WIN32
-const char *clock_name = "win32";
-#else
-const char *clock_name = "linux";
-#endif
+const char *clock_name = PLATFORM;
 b6_flag_named(clock_name, string, "clock");
 
 const char *console_name = "sdl/gl";
@@ -149,7 +132,7 @@ int main(int argc, char *argv[])
 	struct engine engine;
 	struct b6_cmd *cmd;
 	int argn;
-	initialize_log();
+	install_crash_pad();
 	argn = b6_parse_command_line_flags(argc, argv, 0);
 	if (log_flag)
 		switch (*log_flag) {
@@ -159,7 +142,7 @@ int main(int argc, char *argv[])
 		case 'E': case 'e': log_level = LOG_ERROR; break;
 		case 'P': case 'p': log_level = LOG_PANIC; break;
 		}
-	if (!(clock_source = b6_lookup_named_clock(clock_name)))
+	if (clock_name && !(clock_source = b6_lookup_named_clock(clock_name)))
 		log_e("cannot find clock %s", clock_name);
 	if (!(clock_source = b6_get_default_named_clock()))
 		log_p("cannot find a default clock");
@@ -173,17 +156,11 @@ int main(int argc, char *argv[])
 	puts("This program comes with ABSOLUTELY NO WARRANTY.");
 	puts("This is free software, and you are welcome to redistribute it");
 	puts("under certain conditions; see COPYING file for details.");
-#ifdef VERSION
-	fputs("Version: " STRINGIFY(VERSION) "\n", stderr);
-#endif
-#ifdef BUILD
-	fputs("Build: " STRINGIFY(BUILD) "\n", stderr);
-#endif
+	fprintf(stderr, "Build: %s-%s-v%s\n", PLATFORM, BUILD, VERSION);
 	init_all();
 	if (!(console = lookup_console(console_name)))
 		log_p("unknown console: %s", console_name);
 	log_i("using %s console", console_name);
-	BoostPrio();
 	mixer = lookup_mixer("sdl");
 	if (open_mixer(mixer))
 		goto bail_out;
@@ -194,7 +171,6 @@ int main(int argc, char *argv[])
 bail_out:
 	if (mixer)
 		close_mixer(mixer);
-	RevertPrio();
 	exit_all();
 	return retval;
 }

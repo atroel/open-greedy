@@ -19,9 +19,25 @@
 
 BUILD?=$(shell date -u +'%Y%m%d%H%M%S')
 VERSION:=$(shell cat $(SROOT)/VERSION)
-CFLAGS-greedy+=-DBUILD=\"$(BUILD)\" -DVERSION=$(VERSION)
 
-EXTRA_CFLAGS:=-Wall -Werror -pipe
+ifeq ($(PLATFORM),)
+OS=$(shell uname -s)
+ifeq ($(OS),Linux)
+export PLATFORM:=linux
+else
+ifeq ($(OS),Darwin)
+export PLATFORM:=macos
+else
+export PLATFORM:=win32
+endif
+endif
+endif
+
+CFLAGS-greedy+=-DBUILD=\"\\\"$(BUILD)\\\"\"
+CFLAGS-greedy+=-DVERSION=\"\\\"$(VERSION)\\\"\"
+CFLAGS-greedy+=-DPLATFORM=\"\\\"$(PLATFORM)\\\"\"
+
+EXTRA_CFLAGS+=-Wall -Werror -pipe
 
 BASICS:=$(abspath $(SROOT)/../basics)
 EXTRA_CFLAGS+=-I$(BASICS)/include
@@ -36,7 +52,7 @@ ifeq ("$(notdir $(RROOT))","dbg")
 EXTRA_CFLAGS+=-g3 -O0
 else
 EXTRA_CFLAGS+=-g0 -O3 -DNDEBUG
-EXTRA_CFLAGS+=-fomit-frame-pointer -ffast-math -msse -mfpmath=sse
+EXTRA_CFLAGS+=-ffast-math -msse -mfpmath=sse
 endif
 
 bins+=greedy
@@ -44,3 +60,5 @@ greedy+=greedy.o gl/ sdl/ data/ core/ lib/
 
 tools+=embed
 embed+=embed.o lib/
+
+-include $(SROOT)/$D/Build-$(PLATFORM).mk

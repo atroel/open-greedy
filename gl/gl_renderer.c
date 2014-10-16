@@ -116,7 +116,7 @@ struct renderer_tile *new_gl_tile(struct renderer *up,
 static void delete_gl_texture(struct renderer_texture *up)
 {
 	struct gl_texture *self = to_gl_texture(up);
-	glDeleteTextures(1, &self->id);
+	gl_call(glDeleteTextures(1, &self->id));
 	b6_deallocate(to_gl_renderer(up->renderer)->texture_allocator, self);
 }
 
@@ -175,7 +175,7 @@ static struct renderer_texture *new_gl_texture(struct renderer *up,
 	if (!self)
 		return NULL;
 	self->texture.ops = gl_pot ? &ops_pot : &ops;
-	glGenTextures(1, &self->id);
+	gl_call(glGenTextures(1, &self->id));
 	self->texture.ops->update(&self->texture, rgba);
 	return &self->texture;
 }
@@ -236,8 +236,8 @@ static void gl_render_tiles(struct gl_renderer *self,
 			if (texture != NULL) {
 				self->draw_count += 1;
 				bind_gl_texture(to_gl_texture(texture)->id);
-				glDrawArrays(GL_TRIANGLES, local,
-					     *index - local);
+				gl_call(glDrawArrays(GL_TRIANGLES, local,
+						     *index - local));
 			}
 			texture = tile->texture;
 			local = *index;
@@ -247,7 +247,7 @@ static void gl_render_tiles(struct gl_renderer *self,
 	if (texture != NULL) {
 		self->draw_count += 1;
 		bind_gl_texture(to_gl_texture(texture)->id);
-		glDrawArrays(GL_TRIANGLES, local, *index - local);
+		gl_call(glDrawArrays(GL_TRIANGLES, local, *index - local));
 	}
 }
 
@@ -256,8 +256,8 @@ static void gl_render_base(struct gl_renderer *self, struct renderer_base *up,
 {
 	struct b6_dref *dref;
 	visible &= up->visible;
-	glPushMatrix();
-	glTranslatef(up->x, up->y, 0);
+	gl_call(glPushMatrix());
+	gl_call(glTranslatef(up->x, up->y, 0));
 	gl_render_tiles(self, up, index, visible);
 	for (dref = b6_list_first(&up->bases);
 	     dref != b6_list_tail(&up->bases);
@@ -265,7 +265,7 @@ static void gl_render_base(struct gl_renderer *self, struct renderer_base *up,
 		gl_render_base(self,
 			       b6_cast_of(dref, struct renderer_base, dref),
 			       index, visible);
-	glPopMatrix();
+	gl_call(glPopMatrix());
 }
 
 static void gl_render(struct renderer *up)
@@ -279,9 +279,11 @@ static void gl_render(struct renderer *up)
 		push_gl_buffer(self->gl_buffer);
 		self->dirty = 0;
 	}
-	glLoadIdentity();
-	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
-	glColor3f(self->dim, self->dim, self->dim);
+	gl_call(glLoadIdentity());
+	gl_call(glClear(GL_COLOR_BUFFER_BIT|
+			GL_DEPTH_BUFFER_BIT|
+			GL_STENCIL_BUFFER_BIT));
+	gl_call(glColor3f(self->dim, self->dim, self->dim));
 	self->draw_count = 0;
 	gl_render_base(self, &self->root, &index, 1);
 }
@@ -292,39 +294,43 @@ static void gl_resize(struct renderer *up)
 	double hi = up->internal_height;
 	double we = up->external_width;
 	double he = up->external_height;
+	if (we <= 0 || he <= 0 || wi <= 0 || hi <= 0)
+		return;
 	if (we * hi > he * wi) {
 		double width = wi / hi * he;
-		glViewport((we - width) / 2, 0, width, he);
+		gl_call(glViewport((we - width) / 2, 0, width, he));
 	} else {
 		double height = hi / wi * we;
-		glViewport(0, (he - height) / 2, we, height);
+		gl_call(glViewport(0, (he - height) / 2, we, height));
 	}
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(0, wi, hi, 0, 100, -100);
-	glMatrixMode(GL_MODELVIEW);
+	gl_call(glMatrixMode(GL_PROJECTION));
+	gl_call(glLoadIdentity());
+	gl_call(glOrtho(0, wi, hi, 0, 100, -100));
+	gl_call(glMatrixMode(GL_MODELVIEW));
 }
 
 static void gl_start(struct renderer *up)
 {
-	glClearColor(.0f, .0f, .0f, 1.f);
-	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
-	glDisable(GL_DEPTH_TEST);
-	glDepthMask(GL_TRUE);
-	glColor4f(1.f, 1.f, 1.f, 1.f);
-	glEnable(GL_TEXTURE_2D);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-	glEnable(GL_ALPHA_TEST);
-	glEnable(GL_BLEND);
+	gl_call(glClearColor(.0f, .0f, .0f, 1.f));
+	gl_call(glClear(GL_COLOR_BUFFER_BIT|
+			GL_DEPTH_BUFFER_BIT|
+			GL_STENCIL_BUFFER_BIT));
+	gl_call(glDisable(GL_DEPTH_TEST));
+	gl_call(glDepthMask(GL_TRUE));
+	gl_call(glColor4f(1.f, 1.f, 1.f, 1.f));
+	gl_call(glEnable(GL_TEXTURE_2D));
+	gl_call(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+	gl_call(glEnableClientState(GL_VERTEX_ARRAY));
+	gl_call(glEnableClientState(GL_TEXTURE_COORD_ARRAY));
+	gl_call(glEnable(GL_ALPHA_TEST));
+	gl_call(glEnable(GL_BLEND));
 }
 
 static void gl_stop(struct renderer *up)
 {
-	glDisable(GL_BLEND);
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	glDisableClientState(GL_VERTEX_ARRAY);
+	gl_call(glDisable(GL_BLEND));
+	gl_call(glDisableClientState(GL_TEXTURE_COORD_ARRAY));
+	gl_call(glDisableClientState(GL_VERTEX_ARRAY));
 }
 
 static void gl_dim(struct renderer *up, float value)

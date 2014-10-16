@@ -78,8 +78,6 @@ enum log_level {
 extern enum log_level log_level;
 extern const struct b6_clock *log_clock;
 
-extern void initialize_log(void);
-
 static inline void set_log_level(enum log_level level) { log_level = level; }
 
 extern int log_internal(enum log_level, const char *format, ...);

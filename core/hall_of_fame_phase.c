@@ -18,22 +18,21 @@
  */
 
 #include "hall_of_fame_phase.h"
-
-#include "lib/init.h"
-
 #include "console.h"
 #include "controller.h"
+#include "data.h"
 #include "engine.h"
 #include "fade_io.h"
 #include "game.h"
 #include "hall_of_fame.h"
+#include "lib/init.h"
 #include "mixer.h"
 #include "renderer.h"
-#include "data.h"
 #include "toolkit.h"
-
 #include <b6/clock.h>
 #include <b6/cmdline.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 static const char *hof_skin = NULL;
 b6_flag(hof_skin, string);
@@ -59,7 +58,7 @@ struct hall_of_fame_phase {
 	unsigned long int rank;
 };
 
-static const char *user = "PLAYER";
+static const char *user = NULL;
 b6_flag(user, string);
 
 static void u32_to_str(char *str, unsigned long int num, int len)
@@ -102,7 +101,7 @@ static void on_key_pressed(struct controller_observer *observer,
 		quit_phase(self);
 		return;
 	}
-	if (key == CTRLK_RETURN || key == CTRLK_ESCAPE) {
+	if (key == CTRLK_RETURN || key == CTRLK_ENTER || key == CTRLK_ESCAPE) {
 		quit_phase(self);
 		return;
 	}
@@ -176,7 +175,13 @@ static int hall_of_fame_phase_init(struct phase *up, struct engine *engine)
 	struct istream *is;
 	const char *skin_id = hof_skin ? hof_skin : get_skin_id();
 	int i;
-	self->hall_of_fame = load_hall_of_fame(engine->level_data_name,
+	if (!*self->name) {
+		if (!user && !(user = get_user_name()))
+			user = "PLAYER";
+		self->size = snprintf(self->name, sizeof(self->name), "%s",
+				      user);
+	}
+	self->hall_of_fame = load_hall_of_fame(engine->layout_provider->name,
 					       engine->game_config->entry.name);
 	self->engine = engine;
 	self->entry = NULL;
@@ -187,6 +192,10 @@ static int hall_of_fame_phase_init(struct phase *up, struct engine *engine)
 						     engine->game_result.score);
 		if (!self->entry)
 			self->quit = 1;
+		if (self->size > sizeof(self->entry->name)) {
+			self->size = sizeof(self->entry->name);
+			self->name[self->size] = '\0';
+		}
 		engine->game_result.level = 0UL;
 	}
 	root = get_renderer_base(renderer);
@@ -222,10 +231,6 @@ static int hall_of_fame_phase_init(struct phase *up, struct engine *engine)
 				    entry->score, entry->name);
 			continue;
 		}
-		for (self->size = 0; self->size < sizeof(self->name);
-		     self->size += 1)
-			if (!(self->name[self->size] = user[self->size]))
-				break;
 		self->rank = i;
 		setup_label(i, &self->label[i], entry->level, entry->score,
 			    self->name);
@@ -329,6 +334,7 @@ static int hall_of_fame_phase_ctor(void)
 		.exec = hall_of_fame_phase_exec,
 	};
 	static struct hall_of_fame_phase hall_of_fame_phase;
+	hall_of_fame_phase.name[0] = '\0';
 	return register_phase(&hall_of_fame_phase.up, "hall_of_fame", &ops);
 }
 register_init(hall_of_fame_phase_ctor);

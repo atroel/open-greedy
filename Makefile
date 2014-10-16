@@ -24,9 +24,6 @@ MAKEFLAGS+=-r
 # no default variables
 MAKEFLAGS+=-R
 
-# build type
-export B?=Linux
-
 ifeq ($(origin SROOT),command line)
 $(error SROOT should not be specified from the command line)
 endif
@@ -50,7 +47,6 @@ clean:
 else
 bins=
 libs=
--include $(SROOT)/$D/Build-$B.mk
 -include $(SROOT)/$D/Build.mk
 ifeq ($T,)
 CFLAGS:=-I$(SROOT)
@@ -75,15 +71,12 @@ ifneq ("$(LDFLAGS-$T)","")
 LDFLAGS+=$(LDFLAGS-$T)
 endif
 endif
-COMMA=,
 V?=0
 do=@([ "$(V)" -gt 0 ] && echo "$2" || echo " $1"; eval $2)
 nicepath=$(subst $(RROOT)/,,$(abspath $1))
 comp=$(call do,COMP $(call nicepath,$1),gcc -MMD -MT \"$@ $(@:%.o=%.d)\" $(CFLAGS) -o $1 -c $2)
-arch=$(call do,ARCH $(call nicepath,$1),ar qcs -T $1 $2)
-link=$(call do,LINK $(call nicepath,$1),gcc -o $1 \
-     -Wl$(COMMA)--whole-archive $(filter %.a,$2) -Wl$(COMMA)--no-whole-archive \
-     $(filter-out %.a,$2) $(LDFLAGS))
+arch=$(call do,ARCH $(call nicepath,$1),ld -o $1 -r $2)
+link=$(call do,LINK $(call nicepath,$1),gcc -o $1 $2 $(LDFLAGS))
 embed_cmd=+$(call do,DATA $(call nicepath,$1),$(RROOT)/build/embed $(patsubst %.data.o,%,$(notdir $1)) < $2 | gcc $(CFLAGS) -o "$1" -xc -c -)
 sub_clean=+$(foreach t,$1,\
 	  [ ! -d $(RROOT)/$D/$(dir $t) ] || \

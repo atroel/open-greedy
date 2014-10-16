@@ -19,11 +19,18 @@
 
 LDFLAGS-embed+=-lz
 
-CFLAGS-greedy+=`sdl2-config --cflags`
-LDFLAGS-greedy+=`sdl2-config --libs`
-LDFLAGS-greedy+=-lGL
-LDFLAGS-greedy+=-lSDL2
-LDFLAGS-greedy+=-lSDL2_mixer
-LDFLAGS-greedy+=-lz
+SDL:=$(abspath $(SROOT)/../SDL2-2.0.3)
+CFLAGS-greedy+=-I$(SDL)/include
+LDFLAGS-greedy+=-L$(SDL)/i686-w64-mingw32/lib -lSDL2 -lSDL2main
 
-greedy+=linux/
+SDL_MIXER:=$(abspath $(SROOT)/../SDL2_mixer-2.0.0/i686-w64-mingw32)
+CFLAGS-greedy+=-I$(SDL_MIXER)/include/SDL2
+LDFLAGS-greedy+=-L$(SDL_MIXER)/lib -lSDL2_mixer
+
+LDFLAGS-greedy+=-lopengl32
+
+LDFLAGS-greedy+=$(abspath $(SROOT)/../../lib/libz.a)
+
+EXTRA_CFLAGS+=-I$(SROOT)/win32
+
+greedy+=win32/

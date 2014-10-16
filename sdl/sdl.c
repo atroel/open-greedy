@@ -19,7 +19,6 @@
 
 #include <SDL.h>
 #include <SDL_mixer.h>
-#include <GL/gl.h>
 #define BUILDING_STATIC
 #include <xmp.h>
 #undef BUILDING_STATIC
@@ -36,6 +35,7 @@
 #include "lib/io.h"
 #include "lib/log.h"
 #include "lib/std.h"
+#include "platform/gl.h"
 
 static const char *sdl_accel = "1"; /* 0, 1, opengl, direct3d, ... */
 b6_flag(sdl_accel, string);

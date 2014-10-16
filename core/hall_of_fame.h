@@ -34,7 +34,7 @@ struct hall_of_fame {
 	struct b6_entry entry;
 	struct b6_list list;
 	struct hall_of_fame_entry entries[10];
-	char name[64];
+	char name[256];
 };
 
 struct hall_of_fame_iterator {

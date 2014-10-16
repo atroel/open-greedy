@@ -18,10 +18,11 @@
  */
 
 #include "hall_of_fame.h"
-#include <b6/registry.h>
+#include "env.h"
 #include "lib/io.h"
 #include "lib/log.h"
 #include "lib/std.h"
+#include <b6/registry.h>
 
 B6_REGISTRY_DEFINE(hall_of_fame_registry);
 
@@ -153,8 +154,8 @@ struct hall_of_fame *load_hall_of_fame(const char *levels_name,
 	struct hall_of_fame *self;
 	char name[sizeof(self->name)];
 	int len, retval, i;
-	len =  snprintf(name, sizeof(name), "%s.%s.hof", levels_name,
-			config_name);
+	len =  snprintf(name, sizeof(name), "%s/%s.%s.hof", get_rw_dir(),
+			levels_name, config_name);
 	if (len >= sizeof(name))
 		return NULL;
 	entry = b6_lookup_registry(&hall_of_fame_registry, name);

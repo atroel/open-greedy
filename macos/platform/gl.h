@@ -17,38 +17,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "std.h"
+#ifndef PLATFORM_GL_H
+#define PLATFORM_GL_H
 
-#include "log.h"
+#include <OpenGL/gl.h>
+#include <OpenGL/glext.h>
 
-#include <stdlib.h>
+#define gl_ext_gen_buffers glGenBuffers
+#define gl_ext_delete_buffers glDeleteBuffers
+#define gl_ext_buffer_data glBufferData
+#define gl_ext_map_buffer glMapBuffer
+#define gl_ext_unmap_buffer glUnmapBuffer
+#define gl_ext_bind_buffer glBindBuffer
 
-static void *std_allocate(struct b6_allocator *self, unsigned long int size)
-{
-	return malloc(size);
-}
+static inline int gl_buffer_extension_is_supported(void) { return 1; }
 
-static void *std_reallocate(struct b6_allocator *self, void *ptr,
-				unsigned long int size)
-{
-	return realloc(ptr, size);
-}
-
-static void std_deallocate(struct b6_allocator *self, void *ptr)
-{
-	free(ptr);
-}
-
-static const struct b6_allocator_ops std_allocator_ops = {
-	.allocate = std_allocate,
-	.reallocate = std_reallocate,
-	.deallocate = std_deallocate,
-};
-
-struct b6_allocator b6_std_allocator = { .ops = &std_allocator_ops };
-
-void b6_assert_handler(const char *func, const char *file, int line, int type,
-		       const char *cond)
-{
-	log_p("%s:%d: assertion failure (%s)", file, line, cond);
-}
+#endif /* PLATFORM_GL_H */

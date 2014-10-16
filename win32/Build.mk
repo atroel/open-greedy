@@ -18,4 +18,4 @@
 #
 
 libs+=lib.a
-lib.a:=clock.o gl.o
+lib.a:=clock.o debug.o env.o gl.o priority.o

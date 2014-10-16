@@ -17,35 +17,44 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "log.h"
-
+#include "lib/log.h"
+#include <b6/cmdline.h>
+#include <errno.h>
+#include <pwd.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-static FILE *stream = NULL;
-
-const struct b6_clock *log_clock = NULL;
-
-#ifdef NDEBUG
-enum log_level log_level = LOG_WARNING;
-#else
-enum log_level log_level = LOG_DEBUG;
-#endif
-
-int log_internal(enum log_level level, const char *format, ...)
+const char *get_platform_user_name(void)
 {
-	va_list ap;
-	int retval;
-	FILE *fp = stream ? stream : stderr;
-	va_start(ap, format);
-	if (b6_unlikely(level >= LOG_PANIC)) {
-		vfprintf(stderr, format, ap);
-		if (fp != stderr)
-			vfprintf(fp, format, ap);
-		abort();
+	return getlogin();
+}
+
+const char *get_platform_ro_dir(void)
+{
+	return "data";
+}
+
+const char *get_platform_rw_dir(void)
+{
+	static char path[1024];
+	struct passwd *pw;
+	int len, error;
+	pw = getpwuid(getuid());
+	if (!pw || !pw->pw_dir) {
+		log_e("cannot get user's home directory");
+		return NULL;
 	}
-	retval = vfprintf(fp, format, ap);
-	va_end(ap);
-	return retval;
+	len = snprintf(path, sizeof(path), "%s/.opengreedy", pw->pw_dir);
+	if (len >= sizeof(path)) {
+		log_e("path is too long");
+		return NULL;
+	}
+	if (mkdir(path, 0755) && EEXIST != (error = errno)) {
+		log_e("error %d when making directory: %s", error, path);
+		return NULL;
+	}
+	return path;
 }

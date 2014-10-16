@@ -20,10 +20,25 @@
 #ifndef GL_UTILS_H
 #define GL_UTILS_H
 
-#include <GL/gl.h>
+#include "platform/gl.h"
+
+#include "lib/log.h"
+
 #include <b6/array.h>
+#include <b6/utils.h>
 
 struct rgba;
+
+extern GLenum gl_error;
+
+#define gl_call(_exp) do {\
+	GLenum error; \
+	_exp; \
+	error = glGetError(); \
+	if (b6_unlikely(error && error != gl_error)) \
+		log_e("OpenGL error 0x%04x %s", error, #_exp); \
+	gl_error = error; \
+} while (0)
 
 extern void bind_gl_texture(GLuint texture);
 
@@ -91,13 +106,5 @@ struct gl_srv_buffer {
 extern int initialize_gl_srv_buffer(struct gl_srv_buffer*);
 
 extern void finalize_gl_srv_buffer(struct gl_srv_buffer*);
-
-extern int supports_gl_buffer(void);
-extern void bind_gl_buffer(unsigned int id);
-extern void* map_gl_buffer(void);
-extern void unmap_gl_buffer(void);
-extern void create_gl_buffer(unsigned int *id);
-extern void destroy_gl_buffer(unsigned int id);
-extern void alloc_gl_buffer(unsigned long int size);
 
 #endif  /* GL_UTILS_H */

@@ -17,38 +17,37 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "std.h"
-
-#include "log.h"
-
+#include <signal.h>
 #include <stdlib.h>
 
-static void *std_allocate(struct b6_allocator *self, unsigned long int size)
+#include "lib/log.h"
+
+static void crash_pad(int signum)
 {
-	return malloc(size);
+	switch (signum) {
+	case SIGINT:  log_e("interruption"); break;
+	case SIGTERM: log_e("termination request"); break;
+	case SIGABRT: log_e("aborting"); break;
+	case SIGFPE:  log_e("floating point exception"); break;
+	case SIGILL:  log_e("illegal instruction"); break;
+	case SIGSEGV: log_e("segmentation fault"); break;
+	default:
+		log_e("caught signal #%d", signum);
+	}
+	exit(EXIT_FAILURE);
 }
 
-static void *std_reallocate(struct b6_allocator *self, void *ptr,
-				unsigned long int size)
+#define __install_crash_pad(sig) do { \
+	log_i("signal %2d (%s)", sig, #sig); \
+	signal(sig, crash_pad); \
+} while (0)
+
+void install_crash_pad(void)
 {
-	return realloc(ptr, size);
-}
-
-static void std_deallocate(struct b6_allocator *self, void *ptr)
-{
-	free(ptr);
-}
-
-static const struct b6_allocator_ops std_allocator_ops = {
-	.allocate = std_allocate,
-	.reallocate = std_reallocate,
-	.deallocate = std_deallocate,
-};
-
-struct b6_allocator b6_std_allocator = { .ops = &std_allocator_ops };
-
-void b6_assert_handler(const char *func, const char *file, int line, int type,
-		       const char *cond)
-{
-	log_p("%s:%d: assertion failure (%s)", file, line, cond);
+	__install_crash_pad(SIGABRT);
+	__install_crash_pad(SIGFPE);
+	__install_crash_pad(SIGILL);
+	__install_crash_pad(SIGINT);
+	__install_crash_pad(SIGSEGV);
+	__install_crash_pad(SIGTERM);
 }

@@ -18,13 +18,10 @@
  */
 
 #include "data.h"
-
-#include <b6/cmdline.h>
-
 #include "lib/log.h"
-
-static const char *data_path = "data/";
-b6_flag(data_path, string);
+#include <b6/cmdline.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 static const char *skin = "greedy";
 b6_flag(skin, string);
@@ -43,43 +40,10 @@ const char *get_skin_id(void)
 	return skin;
 }
 
-const char *get_data_path(void)
-{
-	return data_path;
-}
-
-static int copy_data_path(char **buf, unsigned long int *len, const char *ptr)
-{
-	while (*ptr) {
-		if (!*len)
-			return -1;
-		**buf = *ptr++;
-		*len -= 1;
-		*buf += 1;
-	}
-	return 0;
-}
-
 int make_data_path(char *buf, unsigned long int len, const char *root,
 		   const char *type, const char *what)
 {
-	static const char separator[] = ".";
-	int retval;
-	if (!len)
-		return -1;
-	len -= 1;
-	if ((retval = copy_data_path(&buf, &len, root)))
-		return retval;
-	if ((retval = copy_data_path(&buf, &len, separator)))
-		return retval;
-	if ((retval = copy_data_path(&buf, &len, type)))
-		return retval;
-	if ((retval = copy_data_path(&buf, &len, separator)))
-		return retval;
-	if ((copy_data_path(&buf, &len, what)))
-		return retval;
-	*buf++ = '\0';
-	return retval;
+	return -(snprintf(buf, len, "%s.%s.%s", root, type, what) >= len);
 }
 
 int get_image_data_no_fallback(const char *skin_id, const char *data_id,

@@ -17,38 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "std.h"
+#ifndef ENV_H
+#define ENV_H
 
-#include "log.h"
+extern const char *get_ro_dir(void);
+extern const char *get_rw_dir(void);
+extern const char *get_user_name(void);
 
-#include <stdlib.h>
-
-static void *std_allocate(struct b6_allocator *self, unsigned long int size)
-{
-	return malloc(size);
-}
-
-static void *std_reallocate(struct b6_allocator *self, void *ptr,
-				unsigned long int size)
-{
-	return realloc(ptr, size);
-}
-
-static void std_deallocate(struct b6_allocator *self, void *ptr)
-{
-	free(ptr);
-}
-
-static const struct b6_allocator_ops std_allocator_ops = {
-	.allocate = std_allocate,
-	.reallocate = std_reallocate,
-	.deallocate = std_deallocate,
-};
-
-struct b6_allocator b6_std_allocator = { .ops = &std_allocator_ops };
-
-void b6_assert_handler(const char *func, const char *file, int line, int type,
-		       const char *cond)
-{
-	log_p("%s:%d: assertion failure (%s)", file, line, cond);
-}
+#endif /* ENV_H */

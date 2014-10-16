@@ -17,18 +17,5 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-LDFLAGS-embed+=-lz
-
-SDL:=$(abspath $(SROOT)/../SDL2-2.0.3)
-CFLAGS-greedy+=-I$(SDL)/include
-LDFLAGS-greedy+=-L$(SDL)/i686-w64-mingw32/lib -lSDL2 -lSDL2main
-
-SDL_MIXER:=$(abspath $(SROOT)/../SDL2_mixer-2.0.0/i686-w64-mingw32)
-CFLAGS-greedy+=-I$(SDL_MIXER)/include/SDL2
-LDFLAGS-greedy+=-L$(SDL_MIXER)/lib -lSDL2_mixer
-
-LDFLAGS-greedy+=-lopengl32
-
-LDFLAGS-greedy+=$(abspath $(SROOT)/../../lib/libz.a)
-
-greedy+=win32/
+libs+=lib.a
+lib.a:=debug.o

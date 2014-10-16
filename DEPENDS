@@ -1,55 +1,51 @@
-Open Greedy has the following dependencies:
-
-
-Dynamic linking is required with the following libraries:
+Dynamic libraries
 
 SDL - http://www.libsdl.org/
-Version: 2.0.3
+Minimum version: 2.0.3
 License: zlib
 
 SDL mixer - http://www.libsdl.org/projects/SDL_mixer/
-Version: 2.0.0
+Minimum version: 2.0.0
 License: zlib
 
 zlib - http://www.zlib.net/
-Version: 1.2.8
+Minimum version: 1.2.8
 License: zlib
 
 OpenGL - http://www.opengl.org/
-Version: 1.0
+Minimum version: 1.0
 
 
-Static linking is required with the following libraries:
+Static libraries
 
 Extended module player library lite - http://xmp.sourceforge.net/
-Version: 4.3.0
+Minimum version: 4.3.0
 License: MIT (Expat)
 
 Basics - https://github.com/atroel/basics/
-Version: 0.2
+Minimum version: 0.2
 License: 2-clause BSD
 
-
-Building for Linux
-
-Open Greedy can be built under Linux using GCC and GNU Make.
-
-Adapt Build.mk to specify where XMP-lite and Basics can be found unless they are
-at the same level as Open Greedy source tree.
-
-To build, run:
-$ make
+Download and build the static libraries beforehand.  Adapt Build.mk accordingly.
 
 
-Building for Windows
+Build on Linux
 
-Open Greedy can be built under Windows using MinGW and GNU Make.
+Open Greedy can be built under GNU/Linux using GCC and GNU Make.  Make sure
+development packages are installed for the dynamic libraries and run make.
 
-Adapt Build.mk to specify where XMP-lite and Basics can be found unless they are
-at the same level as Open Greedy source tree.
 
-Install SDL and SDL mixer for Windows at the same level as Open Greedy source
-tree (or adapt Build-Win32.mk accordingly).
+Build on Windows
 
-To build, run:
-$ make B=Win32
+Open Greedy can be built under Windows using MinGW and GNU Make.  Download SDL2
+and SDL2 mixer development archives for Windows and unpack them at the same
+level as Open Greedy source tree (or adapt Build-Win32.mk accordingly).  Make
+sure development packages are installed for other dynamic libraries and run
+make.
+
+
+Build on Mac OS X
+
+Open Greedy can be built on Mac OS X using GCC and GNU Make.  Download and
+install SDL2 and SDL2 mixer for Mac OS X in ~/Library/Frameworks (or in
+/Library/Frameworks if you prefer a system-wide installation) and run make.

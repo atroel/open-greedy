@@ -17,38 +17,41 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "std.h"
+#include "env.h"
+#include <b6/cmdline.h>
 
-#include "log.h"
+static const char *ro_dir = NULL;
+b6_flag(ro_dir, string);
 
-#include <stdlib.h>
+static const char *rw_dir = NULL;
+b6_flag(rw_dir, string);
 
-static void *std_allocate(struct b6_allocator *self, unsigned long int size)
+static const char *name = NULL;
+b6_flag(name, string);
+
+extern const char *get_platform_ro_dir(void);
+extern const char *get_platform_rw_dir(void);
+extern const char *get_platform_user_name(void);
+
+const char *get_ro_dir(void)
 {
-	return malloc(size);
+	if (!ro_dir)
+		ro_dir = get_platform_ro_dir();
+	b6_check(ro_dir);
+	return ro_dir;
 }
 
-static void *std_reallocate(struct b6_allocator *self, void *ptr,
-				unsigned long int size)
+const char *get_rw_dir(void)
 {
-	return realloc(ptr, size);
+	if (!rw_dir)
+		rw_dir = get_platform_rw_dir();
+	b6_check(rw_dir);
+	return rw_dir;
 }
 
-static void std_deallocate(struct b6_allocator *self, void *ptr)
+extern const char *get_user_name(void)
 {
-	free(ptr);
-}
-
-static const struct b6_allocator_ops std_allocator_ops = {
-	.allocate = std_allocate,
-	.reallocate = std_reallocate,
-	.deallocate = std_deallocate,
-};
-
-struct b6_allocator b6_std_allocator = { .ops = &std_allocator_ops };
-
-void b6_assert_handler(const char *func, const char *file, int line, int type,
-		       const char *cond)
-{
-	log_p("%s:%d: assertion failure (%s)", file, line, cond);
+	if (!name && !(name = get_platform_user_name()))
+		name = "player";
+	return name;
 }

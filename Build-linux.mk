@@ -17,9 +17,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-libs+=lib.a
-lib.a:=controller.o game.o game_controller.o game_mixer.o game_renderer.o \
-	ghosts.o items.o level.o menu.o menu_controller.o menu_mixer.o \
-	menu_renderer.o mixer.o mobile.o pacman.o renderer.o rgba.o data.o \
-	toolkit.o engine.o game_phase.o menu_phase.o lang.o hall_of_fame.o \
-	hall_of_fame_phase.o console.o fade_io.o credits_phase.o env.o
+LDFLAGS-embed+=-lz
+
+CFLAGS-greedy+=`sdl2-config --cflags`
+LDFLAGS-greedy+=`sdl2-config --libs`
+LDFLAGS-greedy+=-lGL
+LDFLAGS-greedy+=-lSDL2
+LDFLAGS-greedy+=-lSDL2_mixer
+LDFLAGS-greedy+=-lz
+
+EXTRA_CFLAGS+=-I$(SROOT)/linux
+EXTRA_LDFLAGS+=-rdynamic # for backtrace
+
+greedy+=linux/ posix/

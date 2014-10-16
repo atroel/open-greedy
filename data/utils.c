@@ -27,6 +27,9 @@
 
 #include <b6/list.h>
 
+#include <stdarg.h>
+#include <stdio.h>
+
 struct lru_cache_entry {
 	struct b6_entry entry;
 	struct b6_dref dref;
@@ -245,35 +248,10 @@ void unregister_cached_image_data(struct cached_image_data *self)
 	unregister_data(&self->buffered_data_entry.up);
 }
 
-static int copy_data_path(char **buf, unsigned long int *len, const char *ptr)
-{
-	while (*ptr) {
-		if (!*len)
-			return -1;
-		**buf = *ptr++;
-		*len -= 1;
-		*buf += 1;
-	}
-	return 0;
-}
-
 static int make_external_data_path(const char *path,
 				   char *buf, unsigned long int len)
 {
-	static const char separator[] = "/";
-	int retval;
-	if (!len)
-		return -1;
-	len -= 1;
-	if ((retval = copy_data_path(&buf, &len, get_data_path())))
-		return retval;
-	if (buf[-1] != *separator &&
-	    (retval = copy_data_path(&buf, &len, separator)))
-			return retval;
-	if ((retval = copy_data_path(&buf, &len, path)))
-		return retval;
-	*buf++ = '\0';
-	return retval;
+	return -(snprintf(buf, len, "%s/%s", get_data_path(), path) >= len);
 }
 
 int load_external_data(struct membuf *self, const char *subpath)

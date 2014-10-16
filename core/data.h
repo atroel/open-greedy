@@ -20,9 +20,10 @@
 #ifndef SKIN_H
 #define SKIN_H
 
-#include <b6/registry.h>
+#include "env.h"
 #include "items.h"
 #include "level.h"
+#include <b6/registry.h>
 
 extern const char *level_data_type;
 extern const char *audio_data_type;
@@ -36,7 +37,7 @@ extern const char *image_data_type;
 
 extern const char *get_skin_id(void);
 
-extern const char *get_data_path(void);
+static inline const char *get_data_path(void) { return get_ro_dir(); }
 
 struct data_entry {
 	struct b6_entry entry;

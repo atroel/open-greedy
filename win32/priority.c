@@ -17,38 +17,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "std.h"
+#include "lib/log.h"
 
-#include "log.h"
+#include "b6/utils.h"
 
-#include <stdlib.h>
+#include <windows.h>
 
-static void *std_allocate(struct b6_allocator *self, unsigned long int size)
+b6_ctor(boost_priority);
+static void boost_priority(void)
 {
-	return malloc(size);
-}
-
-static void *std_reallocate(struct b6_allocator *self, void *ptr,
-				unsigned long int size)
-{
-	return realloc(ptr, size);
-}
-
-static void std_deallocate(struct b6_allocator *self, void *ptr)
-{
-	free(ptr);
-}
-
-static const struct b6_allocator_ops std_allocator_ops = {
-	.allocate = std_allocate,
-	.reallocate = std_reallocate,
-	.deallocate = std_deallocate,
-};
-
-struct b6_allocator b6_std_allocator = { .ops = &std_allocator_ops };
-
-void b6_assert_handler(const char *func, const char *file, int line, int type,
-		       const char *cond)
-{
-	log_p("%s:%d: assertion failure (%s)", file, line, cond);
+	if (!SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS))
+		log_e("Setting priority class failed: %d", GetLastError());
 }

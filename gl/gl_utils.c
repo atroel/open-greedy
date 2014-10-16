@@ -26,10 +26,14 @@
 static int use_gl_ext = 1;
 b6_flag(use_gl_ext, bool);
 
-static int cache_gl_texture = 0;
+#define NO_GL_ID ((GLuint)-1)
+
+GLenum gl_error = 0;
+
+static int cache_gl_texture = 1;
 b6_flag(cache_gl_texture, bool);
 
-static GLuint current_texture_id = ~0U;
+static GLuint current_texture_id = NO_GL_ID;
 
 void bind_gl_texture(GLuint texture)
 {
@@ -39,19 +43,21 @@ void bind_gl_texture(GLuint texture)
 	}
 }
 
-void unbind_gl_texture() { current_texture_id = ~0U; }
+void unbind_gl_texture() { current_texture_id = NO_GL_ID; }
 
 void make_gl_texture(GLuint id, const struct rgba *rgba)
 {
-	bind_gl_texture(id);
-	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S, GL_CLAMP);
-	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T, GL_CLAMP);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rgba->w, rgba->h, 0, GL_RGBA,
-		     GL_UNSIGNED_BYTE, rgba->p);
-	glFlush();
+	gl_call(bind_gl_texture(id));
+	gl_call(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0));
+	gl_call(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+				GL_LINEAR));
+	gl_call(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+				GL_LINEAR));
+	gl_call(glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S, GL_CLAMP));
+	gl_call(glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T, GL_CLAMP));
+        gl_call(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rgba->w, rgba->h, 0,
+			     GL_RGBA, GL_UNSIGNED_BYTE, rgba->p));
+	gl_call(glFlush());
 }
 
 static void initialize_gl_buffer(struct gl_buffer *self,
@@ -73,8 +79,8 @@ static int push_gl_cli_buffer(struct gl_buffer *gl_buffer)
 	float *t = b6_array_get(&gl_buffer->t, 0);
 	float *v = b6_array_get(&gl_buffer->v, 0);
 	log_i("pushing %u vertices", b6_array_length(&gl_buffer->t));
-	glTexCoordPointer(2, GL_FLOAT, 0, t);
-	glVertexPointer(2, GL_FLOAT, 0, v);
+	gl_call(glTexCoordPointer(2, GL_FLOAT, 0, t));
+	gl_call(glVertexPointer(2, GL_FLOAT, 0, v));
 	return 0;
 }
 
@@ -90,21 +96,41 @@ void finalize_gl_cli_buffer(struct gl_cli_buffer *self)
 	finalize_gl_buffer(&self->gl_buffer);
 }
 
-static GLuint current_buffer_id = 0;
-
-void maybe_bind_gl_buffer(unsigned int id)
+static void bind_gl_buffer(unsigned int id)
 {
 	b6_static_assert(sizeof(GLuint) == sizeof(unsigned int));
-	if (id == current_buffer_id)
-		return;
-	current_buffer_id = id;
-	bind_gl_buffer(id);
+	gl_call(gl_ext_bind_buffer(GL_ARRAY_BUFFER, id));
 }
 
-void maybe_unbind_gl_buffer(unsigned int id)
+static void* map_gl_buffer(void)
 {
-	if (id == current_buffer_id)
-		bind_gl_buffer(0);
+	void *ptr = NULL;
+	gl_call(ptr = gl_ext_map_buffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY));
+	b6_check(ptr);
+	return ptr;
+}
+
+static void unmap_gl_buffer(void)
+{
+	gl_call(gl_ext_unmap_buffer(GL_ARRAY_BUFFER));
+}
+
+static void create_gl_buffer(unsigned int *id)
+{
+	gl_call(gl_ext_gen_buffers(1, id));
+}
+
+static void destroy_gl_buffer(unsigned int id)
+{
+	gl_call(bind_gl_buffer(NO_GL_ID));
+	gl_call(gl_ext_delete_buffers(1, &id));
+}
+
+static void alloc_gl_buffer(unsigned long int size)
+{
+	gl_call(gl_ext_buffer_data(GL_ARRAY_BUFFER, size, NULL,
+				   GL_STREAM_DRAW));
+	/* GL_STATIC_DRAW, GL_STREAM_DRAW or GL_DYNAMIC_DRAW */
 }
 
 int push_gl_srv_buffer(struct gl_buffer *gl_buffer)
@@ -129,12 +155,10 @@ int push_gl_srv_buffer(struct gl_buffer *gl_buffer)
 	if (size > self->size) {
 		log_i("allocating %u bytes", size);
 		self->size = size;
-		if (self->id) {
-			maybe_unbind_gl_buffer(self->id);
+		if (self->id != ~0UL)
 			destroy_gl_buffer(self->id);
-		}
 		create_gl_buffer(&self->id);
-		maybe_bind_gl_buffer(self->id);
+		bind_gl_buffer(self->id);
 		alloc_gl_buffer(size);
 	}
 	log_i("pushing %u/%u vertices", len, max);
@@ -142,8 +166,8 @@ int push_gl_srv_buffer(struct gl_buffer *gl_buffer)
 	q = p + max * 2;
 	while (len--) { *p++ = *t++; *p++ = *t++; *q++ = *v++; *q++ = *v++; }
 	unmap_gl_buffer();
-	glTexCoordPointer(2, GL_FLOAT, 0, NULL);
-	glVertexPointer(2, GL_FLOAT, 0, ((float*)NULL) + max * 2);
+	gl_call(glTexCoordPointer(2, GL_FLOAT, 0, NULL));
+	gl_call(glVertexPointer(2, GL_FLOAT, 0, ((float*)NULL) + max * 2));
 	return 0;
 }
 
@@ -157,10 +181,10 @@ void finalize_gl_srv_buffer(struct gl_srv_buffer *self)
 int initialize_gl_srv_buffer(struct gl_srv_buffer *self)
 {
 	static const struct gl_buffer_ops ops = { .push = push_gl_srv_buffer, };
-	if (!use_gl_ext || !supports_gl_buffer())
+	if (!use_gl_ext || !gl_buffer_extension_is_supported())
 		return -1;
 	initialize_gl_buffer(&self->gl_buffer, &ops);
-	self->id = 0;
+	self->id = NO_GL_ID;
 	self->size = 0;
 	return 0;
 }

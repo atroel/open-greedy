@@ -27,14 +27,14 @@ b6_flag(ws, ushort);
 static unsigned short int hs = 0;
 b6_flag(hs, ushort);
 
-#ifdef NDEBUG
-static int fs = 1;
-#else
 static int fs = 0;
-#endif
 b6_flag(fs, bool);
 
+#if defined(__linux__)
 static int vs = 0;
+#else
+static int vs = 1;
+#endif
 b6_flag(vs, bool);
 
 B6_REGISTRY_DEFINE(__console_registry);
