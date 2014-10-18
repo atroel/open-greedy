@@ -364,12 +364,13 @@ static int greedy_skin_ctor(void)
 	static const unsigned short font_w = 16, font_h = 16;
 	for (j = 0; j < b6_card_of(font_x); j += 1)
 		for (i = 0; i < b6_card_of(font_x[j]); i += 1) {
-			if (i < ' ' || i > ']') {
+			if (i >= 'a' && i <= 'z')
+				k = i - 64;
+			else if (i < ' ' || i > ']') {
 				font_x[j][i] = 0;
 				font_y[j][i] = 0;
 				continue;
-			}
-			if (i == '\"')
+			} else if (i == '\"')
 				k = '\'' - 32;
 			else if (i == '\'')
 				k = '\"' - 32;

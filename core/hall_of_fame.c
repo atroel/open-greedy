@@ -53,9 +53,7 @@ void put_hall_of_fame_entry(struct hall_of_fame *self,
 	int i = 0;
 	while (*name && i < b6_card_of(entry->name)) {
 		char c = *name++;
-		if (c >= 'a' && c <= 'z')
-			c -= ' ';
-		else if (c < ' ' || c > ']')
+		if (c < ' ')
 			c = '.';
 		entry->name[i++] = c;
 	}

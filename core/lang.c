@@ -23,12 +23,12 @@ B6_REGISTRY_DEFINE(__lang_registry);
 
 const struct lang __lang_default = {
 	.menu = {
-		.play = "PLAY",
-		.hof = "HISCORES",
-		.credits = "CREDITS",
-		.quit = "QUIT",
-		.mode_slow = "MODE: SLOW",
-		.mode_fast = "MODE: FAST",
+		.play = "Play",
+		.hof = "Hiscores",
+		.credits = "Credits",
+		.quit = "Quit",
+		.mode_slow = "Mode: slow",
+		.mode_fast = "Mode: fast",
 	},
 	.game = {
 		.get_ready      = "GET READY!",
@@ -96,12 +96,12 @@ const struct lang __lang_default = {
 
 register_lang(fr) = {
 	.menu = {
-		.play = "JOUER",
-		.hof = "MEILLEURS SCORES",
-		.credits = "CREDITS",
-		.quit = "QUITTER",
-		.mode_slow = "MODE: LENT",
-		.mode_fast = "MODE: RAPIDE",
+		.play = "Jouer",
+		.hof = "Meilleurs scores",
+		.credits = "Credits",
+		.quit = "Quitter",
+		.mode_slow = "Mode: lent",
+		.mode_fast = "Mode: rapide",
 	},
 	.game = {
 		.get_ready      = "PRET?",

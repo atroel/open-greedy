@@ -112,8 +112,7 @@ static void on_key_pressed(struct controller_observer *observer,
 		return;
 	self->size -= 1;
 	b6_assert(self->cursor_base);
-	move_renderer_base(self->cursor_base, self->cursor_base->x -
-			   get_fixed_font_width(&self->font),
+	move_renderer_base(self->cursor_base, self->cursor_base->x - 16,
 			   self->cursor_base->y);
 	self->name[self->size] = '\0';
 	setup_label(self->rank, &self->label[self->rank],
@@ -131,20 +130,16 @@ static void on_text_input(struct controller_observer *observer,
 		quit_phase(self);
 		return;
 	}
-	if (unicode >= 'a' && unicode <= 'z')
-		unicode -= ' ';
 	if (unicode < 32)
 		return;
-	if (unicode > 95)
+	if (unicode > 127)
 		return;
 	if (self->size >= sizeof(self->entry->name))
 		return;
 	self->name[self->size++] = unicode;
 	b6_assert(self->cursor_base);
-	move_renderer_base(
-		self->cursor_base,
-		self->cursor_base->x + get_fixed_font_width(&self->font),
-		self->cursor_base->y);
+	move_renderer_base(self->cursor_base,
+			   self->cursor_base->x + 16, self->cursor_base->y);
 	self->name[self->size] = '\0';
 	setup_label(self->rank, &self->label[self->rank], self->entry->level,
 		    self->entry->score, self->name);
@@ -244,7 +239,7 @@ static int hall_of_fame_phase_init(struct phase *up, struct engine *engine)
 		self->cursor_base = create_renderer_base_or_die(renderer, root,
 								"cursor", x, y);
 		initialize_toolkit_label(&self->cursor_label, renderer,
-					 &self->font, font_w, font_h,
+					 &self->font, 16, 16,
 					 self->cursor_base, 1, 1, 16, 16);
 		enable_toolkit_label_shadow(&self->cursor_label);
 		set_toolkit_label(&self->cursor_label, "#");
