@@ -22,6 +22,7 @@
 
 #include <b6/registry.h>
 #include "core/console.h"
+#include "core/controller.h"
 #include "core/level.h"
 
 struct game_result {
@@ -37,8 +38,11 @@ struct engine {
 	const struct game_config *game_config;
 	struct layout_provider *layout_provider;
 	struct layout_shuffler layout_shuffler;
-	int shuffle;
+	short int shuffle;
+	short int quit;
+	struct phase *curr;
 	struct game_result game_result;
+	struct controller_observer observer;
 };
 
 static inline struct controller *get_engine_controller(const struct engine *e)
@@ -60,9 +64,11 @@ struct phase {
 };
 
 struct phase_ops {
-	int (*init)(struct phase*, struct engine*);
-	void (*exit)(struct phase*, struct engine*);
-	struct phase *(*exec)(struct phase*, struct engine*);
+	int (*init)(struct phase*);
+	void (*exit)(struct phase*);
+	struct phase *(*exec)(struct phase*);
+	void (*suspend)(struct phase*);
+	void (*resume)(struct phase*);
 };
 
 extern void setup_engine(struct engine *self, const struct b6_clock *clock,

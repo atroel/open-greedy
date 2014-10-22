@@ -94,6 +94,9 @@ struct controller_observer_ops {
 	void (*on_key_released)(struct controller_observer*,
 				enum controller_key);
 	void (*on_text_input)(struct controller_observer*, unsigned short int);
+	void (*on_quit)(struct controller_observer*);
+	void (*on_focus_in)(struct controller_observer*);
+	void (*on_focus_out)(struct controller_observer*);
 };
 
 extern void __notify_controller_key_pressed(struct controller*,
@@ -111,6 +114,12 @@ static inline void notify_controller_text_input(struct controller *self,
 	if (unicode)
 		__notify_controller_text_input(self, unicode);
 }
+
+extern void __notify_controller_quit(struct controller *self);
+
+extern void __notify_controller_focus_in(struct controller *self);
+
+extern void __notify_controller_focus_out(struct controller *self);
 
 static inline struct controller_observer *setup_controller_observer(
 	struct controller_observer *self,

@@ -40,6 +40,8 @@ struct istream;
 struct mixer_ops {
 	int (*open)(struct mixer*);
 	void (*close)(struct mixer*);
+	void (*suspend)(struct mixer*);
+	void (*resume)(struct mixer*);
 	struct sample *(*load_sample)(struct mixer*, const char*);
 	struct sample *(*make_sample)(struct mixer*, const void*,
 				      unsigned long long int);
@@ -133,6 +135,16 @@ static inline void play_music(struct mixer *self)
 static inline void stop_music(struct mixer *self)
 {
 	self->ops->stop_music(self);
+}
+
+static inline void suspend_mixer(struct mixer *self)
+{
+	self->ops->suspend(self);
+}
+
+static inline void resume_mixer(struct mixer *self)
+{
+	self->ops->resume(self);
 }
 
 static inline void set_music_pos(struct mixer *self, int pos)

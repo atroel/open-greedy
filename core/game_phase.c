@@ -52,31 +52,31 @@ static struct game_phase *to_game_phase(struct phase *up)
 	return b6_cast_of(up, struct game_phase, up);
 }
 
-static int game_phase_init(struct phase *up, struct engine *engine)
+static int game_phase_init(struct phase *up)
 {
 	struct game_phase *self = to_game_phase(up);
 	const char *skin_id = game_skin ? game_skin : get_skin_id();
 	int retval;
-	b6_setup_cached_clock(&self->clock, engine->clock);
+	b6_setup_cached_clock(&self->clock, up->engine->clock);
 	if ((retval = initialize_game(&self->game, &self->clock.up,
-				      engine->game_config,
-				      get_engine_layouts(engine), level))) {
+				      up->engine->game_config,
+				      get_engine_layouts(up->engine), level))) {
 		log_e("cannot initialize game (%d)", retval);
 		goto fail_game;
 	}
 	if ((retval = initialize_game_renderer(&self->renderer,
-					       get_engine_renderer(engine),
+					       get_engine_renderer(up->engine),
 					       &self->clock.up, &self->game,
-					       skin_id, engine->lang))) {
+					       skin_id, up->engine->lang))) {
 		log_e("cannot initialize game renderer (%d)", retval);
 		goto fail_renderer;
 	}
 	initialize_game_mixer(&self->mixer, &self->game, skin_id,
-			      engine->mixer);
+			      up->engine->mixer);
 	initialize_game_controller(&self->controller, &self->game,
-				   get_engine_controller(engine));
-	engine->game_result.score = 0;
-	engine->game_result.level = 0;
+				   get_engine_controller(up->engine));
+	up->engine->game_result.score = 0;
+	up->engine->game_result.level = 0;
 	return 0;
 fail_renderer:
 	finalize_game(&self->game);
@@ -84,7 +84,7 @@ fail_game:
 	return -1;
 }
 
-static void game_phase_exit(struct phase *up, struct engine *engine)
+static void game_phase_exit(struct phase *up)
 {
 	struct game_phase *self = to_game_phase(up);
 	finalize_game_mixer(&self->mixer);
@@ -93,13 +93,18 @@ static void game_phase_exit(struct phase *up, struct engine *engine)
 	finalize_game(&self->game);
 }
 
-static struct phase *game_phase_exec(struct phase *up, struct engine *engine)
+static void game_phase_suspend(struct phase *up)
+{
+	pause_game(&to_game_phase(up)->game);
+}
+
+static struct phase *game_phase_exec(struct phase *up)
 {
 	struct game_phase *self = to_game_phase(up);
 	b6_sync_cached_clock(&self->clock);
 	if (!play_game(&self->game)) {
-		engine->game_result.score = self->game.pacman.score;
-		engine->game_result.level = self->game.n;
+		up->engine->game_result.score = self->game.pacman.score;
+		up->engine->game_result.level = self->game.n;
 		return lookup_phase("hall_of_fame");
 	}
 	update_game(&self->game);
@@ -112,6 +117,7 @@ static int game_phase_ctor(void)
 		.init = game_phase_init,
 		.exit = game_phase_exit,
 		.exec = game_phase_exec,
+		.suspend = game_phase_suspend,
 	};
 	static struct game_phase game_phase;
 	return register_phase(&game_phase.up, "game", &ops);

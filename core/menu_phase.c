@@ -329,7 +329,7 @@ static void on_select(struct menu_observer *menu_observer)
 	enter_submenu(self, submenu);
 }
 
-static int menu_phase_init(struct phase *up, struct engine *engine)
+static int menu_phase_init(struct phase *up)
 {
 	static const struct menu_observer_ops menu_observer_ops = {
 		.on_select = on_select,
@@ -362,22 +362,23 @@ static int menu_phase_init(struct phase *up, struct engine *engine)
 	self->options_menu.up.ops = &options_ops;
 	self->game_options_menu.up.ops = &game_options_ops;
 	self->video_options_menu.up.ops = &video_options_ops;
-	if ((retval = initialize_menu_renderer(&self->renderer,
-					       get_engine_renderer(engine),
-					       engine->clock, skin_id))) {
+	retval = initialize_menu_renderer(&self->renderer,
+					  get_engine_renderer(up->engine),
+					  up->engine->clock, skin_id);
+	if (retval) {
 		log_e("cannot initialize menu renderer (%d)", retval);
 		return -1;
 	}
 	setup_menu_observer(&self->menu_observer, &menu_observer_ops);
 	enter_submenu(self, &self->main_menu.up);
 	initialize_menu_mixer(&self->mixer, &self->menu, skin_id,
-			      engine->mixer);
+			      up->engine->mixer);
 	initialize_menu_controller(&self->controller, &self->menu,
-				   get_engine_controller(engine));
+				   get_engine_controller(up->engine));
 	return 0;
 }
 
-static void menu_phase_exit(struct phase *up, struct engine *engine)
+static void menu_phase_exit(struct phase *up)
 {
 	struct menu_phase *self = to_menu_phase(up);
 	finalize_menu_controller(&self->controller);
@@ -386,7 +387,7 @@ static void menu_phase_exit(struct phase *up, struct engine *engine)
 	finalize_menu_renderer(&self->renderer);
 }
 
-static struct phase *menu_phase_exec(struct phase *up, struct engine *engine)
+static struct phase *menu_phase_exec(struct phase *up)
 {
 	return to_menu_phase(up)->next;
 }

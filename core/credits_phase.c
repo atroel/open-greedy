@@ -131,13 +131,13 @@ static void on_key_pressed(struct controller_observer *observer,
 		self->next = lookup_phase("menu");
 }
 
-static int credits_phase_init(struct phase *up, struct engine *engine)
+static int credits_phase_init(struct phase *up)
 {
 	static const struct controller_observer_ops controller_observer_ops = {
 		.on_key_pressed = on_key_pressed,
 	};
 	struct credits_phase *self = b6_cast_of(up, struct credits_phase, up);
-	struct renderer *renderer = get_engine_renderer(engine);
+	struct renderer *renderer = get_engine_renderer(up->engine);
 	struct renderer_base *root = get_renderer_base(renderer);
 	struct data_entry *data;
 	struct istream *istream;
@@ -152,14 +152,14 @@ static int credits_phase_init(struct phase *up, struct engine *engine)
 		set_renderer_tile_texture(self->background, make_texture(
 			renderer, credits_skin, CREDITS_BACKGROUND_DATA_ID));
 	initialize_credits_phase_pacman(&self->pacman, renderer,
-					engine->clock, 0, 0, 640, 480);
+					up->engine->clock, 0, 0, 640, 480);
 	self->labels_base = create_renderer_base_or_die(renderer, root,
 							"labels", 0, 0);
 	for (i = 0; i < b6_card_of(self->lines); i += 1) {
 		const unsigned short int u = 2 + 52 * font_w, v = 2 + font_h;
 		const float x = 8, y = i * 16;
 		const float w = 2 + 52 * 12, h = 2 + 16;
-		const char *text = engine->lang->credits.lines[i];
+		const char *text = up->engine->lang->credits.lines[i];
 		initialize_toolkit_label(&self->lines[i], renderer, &self->font,
 					 u, v, self->labels_base, x, y, w, h);
 		enable_toolkit_label_shadow(&self->lines[i]);
@@ -169,14 +169,14 @@ static int credits_phase_init(struct phase *up, struct engine *engine)
 	if ((data = lookup_data(credits_skin, audio_data_type,
 				CREDITS_MUSIC_DATA_ID)) &&
 	    (istream = get_data(data))) {
-		self->music = engine->mixer->ops->load_music_from_stream(
-			engine->mixer, istream);
+		self->music = up->engine->mixer->ops->load_music_from_stream(
+			up->engine->mixer, istream);
 		put_data(data, istream);
-		play_music(engine->mixer);
+		play_music(up->engine->mixer);
 		self->music = 1;
 	} else
 		self->music = 0;
-	add_controller_observer(get_engine_controller(engine),
+	add_controller_observer(get_engine_controller(up->engine),
 				setup_controller_observer(
 					&self->controller_observer,
 					&controller_observer_ops));
@@ -184,14 +184,14 @@ static int credits_phase_init(struct phase *up, struct engine *engine)
 	return 0;
 }
 
-static void credits_phase_exit(struct phase *up, struct engine *engine)
+static void credits_phase_exit(struct phase *up)
 {
 	struct credits_phase *self = b6_cast_of(up, struct credits_phase, up);
 	int i;
 	del_controller_observer(&self->controller_observer);
 	if (self->music) {
-		stop_music(engine->mixer);
-		unload_music(engine->mixer);
+		stop_music(up->engine->mixer);
+		unload_music(up->engine->mixer);
 	}
 	for (i = 0; i < b6_card_of(self->lines); i += 1)
 		finalize_toolkit_label(&self->lines[i]);
@@ -204,7 +204,7 @@ static void credits_phase_exit(struct phase *up, struct engine *engine)
 	}
 }
 
-static struct phase *credits_phase_exec(struct phase *up, struct engine *engine)
+static struct phase *credits_phase_exec(struct phase *up)
 {
 	return b6_cast_of(up, struct credits_phase, up)->next;
 }

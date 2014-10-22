@@ -201,35 +201,45 @@ static enum controller_key sdl_to_controller_key(int sym)
 static void sdl_console_poll(struct console *up)
 {
 	SDL_Event event;
-	while (SDL_PollEvent(&event)) {
-		switch (event.type) {
-		case SDL_KEYDOWN:
-			if (event.key.repeat)
-				break;
-			__notify_controller_key_pressed(
-				up->default_controller,
-				sdl_to_controller_key(event.key.keysym.sym));
+again:
+	if (!SDL_PollEvent(&event))
+		return;
+	switch (event.type) {
+	case SDL_KEYDOWN:
+		if (event.key.repeat)
 			break;
-		case SDL_KEYUP:
-			__notify_controller_key_released(
-				up->default_controller,
-				sdl_to_controller_key(event.key.keysym.sym));
-			break;
-		case SDL_TEXTINPUT:
-			notify_controller_text_input(up->default_controller,
-						     event.text.text[0]);
-			break;
-		case SDL_WINDOWEVENT:
-			if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
-				unsigned short int w = event.window.data1;
-				unsigned short int h = event.window.data2;
-				resize_renderer(up->default_renderer, w, h);
-			}
-			break;
-		default:
-			break;
-		}
+		__notify_controller_key_pressed(
+			up->default_controller,
+			sdl_to_controller_key(event.key.keysym.sym));
+		break;
+	case SDL_KEYUP:
+		__notify_controller_key_released(
+			up->default_controller,
+			sdl_to_controller_key(event.key.keysym.sym));
+		break;
+	case SDL_TEXTINPUT:
+		notify_controller_text_input(up->default_controller,
+					     event.text.text[0]);
+		break;
+	case SDL_WINDOWEVENT:
+		if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+			unsigned short int w = event.window.data1;
+			unsigned short int h = event.window.data2;
+			resize_renderer(up->default_renderer, w, h);
+		} else if (event.window.event == SDL_WINDOWEVENT_CLOSE)
+			__notify_controller_quit(up->default_controller);
+		else if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED)
+			__notify_controller_focus_in(up->default_controller);
+		else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
+			__notify_controller_focus_out(up->default_controller);
+		break;
+	case SDL_QUIT:
+		__notify_controller_quit(up->default_controller);
+		break;
+	default:
+		break;
 	}
+	goto again;
 }
 
 struct sdl_texture {
@@ -610,6 +620,7 @@ struct sdl_mixer {
 	struct sdl_sample samples[32];
 	Mix_Chunk *channel[8];
 	xmp_context ctx;
+	int suspended;
 };
 
 static struct sdl_mixer *to_sdl_mixer(struct mixer *mixer)
@@ -764,7 +775,9 @@ static void sdl_mixer_unload_music(struct mixer *up)
 {
 	struct sdl_mixer *self = to_sdl_mixer(up);
 	xmp_release_module(self->ctx);
+	SDL_Delay(200);
 	xmp_free_context(self->ctx);
+	SDL_Delay(200);
 }
 
 static void mute_hook(void *cookie, Uint8 *stream, int len)
@@ -803,6 +816,22 @@ static void sdl_mixer_stop_music(struct mixer *up)
 	xmp_end_player(self->ctx);
 }
 
+static void sdl_mixer_suspend(struct mixer *up)
+{
+	struct sdl_mixer *self = to_sdl_mixer(up);
+	if (!self->suspended)
+		SDL_PauseAudio(1);
+	self->suspended = 1;
+}
+
+static void sdl_mixer_resume(struct mixer *up)
+{
+	struct sdl_mixer *self = to_sdl_mixer(up);
+	if (self->suspended)
+		SDL_PauseAudio(0);
+	self->suspended = 0;
+}
+
 static void sdl_mixer_set_music_pos(struct mixer *up, int pos)
 {
 	SDL_LockAudio();
@@ -829,6 +858,7 @@ static int sdl_mixer_open(struct mixer *up)
 		return -2;
 	}
 	Mix_ChannelFinished(free_sdl_audio_channel);
+	self->suspended = 0;
 	return 0;
 }
 
@@ -859,6 +889,8 @@ static int sdl_mixer_register(void)
 		.unload_music = sdl_mixer_unload_music,
 		.play_music = sdl_mixer_play_music,
 		.stop_music = sdl_mixer_stop_music,
+		.suspend = sdl_mixer_suspend,
+		.resume = sdl_mixer_resume,
 		.set_music_pos = sdl_mixer_set_music_pos,
 	};
 	setup_mixer(&sdl_mixer.mixer, &ops);

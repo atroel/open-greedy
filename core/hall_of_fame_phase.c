@@ -39,7 +39,6 @@ b6_flag(hof_skin, string);
 
 struct hall_of_fame_phase {
 	struct phase up;
-	struct engine *engine;
 	struct hall_of_fame *hall_of_fame;
 	struct controller_observer controller_observer;
 	short int music;
@@ -150,13 +149,13 @@ static void on_render(struct renderer_observer *observer)
 		observer, struct hall_of_fame_phase, renderer_observer);
 	if (!self->cursor_base)
 		return;
-	if (b6_get_clock_time(self->engine->clock) & 524288ULL)
+	if (b6_get_clock_time(self->up.engine->clock) & 524288ULL)
 		show_renderer_base(self->cursor_base);
 	else
 		hide_renderer_base(self->cursor_base);
 }
 
-static int hall_of_fame_phase_init(struct phase *up, struct engine *engine)
+static int hall_of_fame_phase_init(struct phase *up)
 {
 	static const struct controller_observer_ops controller_observer_ops = {
 		.on_key_pressed = on_key_pressed,
@@ -167,7 +166,7 @@ static int hall_of_fame_phase_init(struct phase *up, struct engine *engine)
 	};
 	struct hall_of_fame_phase *self =
 		b6_cast_of(up, struct hall_of_fame_phase, up);
-	struct renderer *renderer = get_engine_renderer(engine);
+	struct renderer *renderer = get_engine_renderer(up->engine);
 	struct renderer_base *root;
 	unsigned short int font_w, font_h;
 	struct hall_of_fame_iterator iter;
@@ -181,22 +180,23 @@ static int hall_of_fame_phase_init(struct phase *up, struct engine *engine)
 		self->size = snprintf(self->name, sizeof(self->name), "%s",
 				      user);
 	}
-	self->hall_of_fame = load_hall_of_fame(engine->layout_provider->name,
-					       engine->game_config->entry.name);
-	self->engine = engine;
+	self->hall_of_fame =
+		load_hall_of_fame(up->engine->layout_provider->name,
+				  up->engine->game_config->entry.name);
 	self->entry = NULL;
 	self->quit = 0;
-	if (engine->game_result.level) {
-		self->entry = get_hall_of_fame_entry(self->hall_of_fame,
-						     engine->game_result.level,
-						     engine->game_result.score);
+	if (up->engine->game_result.level) {
+		self->entry =
+			get_hall_of_fame_entry(self->hall_of_fame,
+					       up->engine->game_result.level,
+					       up->engine->game_result.score);
 		if (!self->entry)
 			self->quit = 1;
 		if (self->size > sizeof(self->entry->name)) {
 			self->size = sizeof(self->entry->name);
 			self->name[self->size] = '\0';
 		}
-		engine->game_result.level = 0UL;
+		up->engine->game_result.level = 0UL;
 	}
 	root = get_renderer_base(renderer);
 	if (make_font(&self->font, skin_id, HOF_FONT_DATA_ID))
@@ -253,13 +253,13 @@ static int hall_of_fame_phase_init(struct phase *up, struct engine *engine)
 	add_renderer_observer(renderer, setup_renderer_observer(
 			&self->renderer_observer, "hof",
 			&renderer_observer_ops));
-	add_controller_observer(get_engine_controller(engine),
+	add_controller_observer(get_engine_controller(up->engine),
 				setup_controller_observer(
 					&self->controller_observer,
 					&controller_observer_ops));
 	self->music = 0;
 	initialize_fade_io(&self->fade_io, "hof_fade_io", renderer,
-			   engine->clock, 0., 1., 5e-6);
+			   up->engine->clock, 0., 1., 5e-6);
 	if (self->quit) {
 		set_fade_io_target(&self->fade_io, 0.);
 		return 0;
@@ -267,10 +267,10 @@ static int hall_of_fame_phase_init(struct phase *up, struct engine *engine)
 	if ((entry = lookup_data(skin_id, audio_data_type,
 				 HOF_MUSIC_DATA_ID)) &&
 	    (is = get_data(entry))) {
-		int retval = engine->mixer->ops->load_music_from_stream(
-			engine->mixer, is);
+		int retval = up->engine->mixer->ops->load_music_from_stream(
+			up->engine->mixer, is);
 		if (!retval) {
-			play_music(engine->mixer);
+			play_music(up->engine->mixer);
 			self->music = 1;
 		} else
 			log_w("could not load background music");
@@ -280,7 +280,7 @@ static int hall_of_fame_phase_init(struct phase *up, struct engine *engine)
 	return 0;
 }
 
-static void hall_of_fame_phase_exit(struct phase *up, struct engine *engine)
+static void hall_of_fame_phase_exit(struct phase *up)
 {
 	struct hall_of_fame_phase *self =
 		b6_cast_of(up, struct hall_of_fame_phase, up);
@@ -292,10 +292,10 @@ static void hall_of_fame_phase_exit(struct phase *up, struct engine *engine)
 		save_hall_of_fame(self->hall_of_fame);
 		self->entry = NULL;
 	}
-	engine->game_result.score = 0ULL;
+	up->engine->game_result.score = 0ULL;
 	if (self->music) {
-		stop_music(engine->mixer);
-		unload_music(engine->mixer);
+		stop_music(up->engine->mixer);
+		unload_music(up->engine->mixer);
 	}
 	del_controller_observer(&self->controller_observer);
 	del_renderer_observer(&self->renderer_observer);
@@ -316,8 +316,7 @@ static void hall_of_fame_phase_exit(struct phase *up, struct engine *engine)
 	finalize_fixed_font(&self->font);
 }
 
-static struct phase *hall_of_fame_phase_exec(struct phase *up,
-					     struct engine *engine)
+static struct phase *hall_of_fame_phase_exec(struct phase *up)
 {
 	struct hall_of_fame_phase *self =
 		b6_cast_of(up, struct hall_of_fame_phase, up);

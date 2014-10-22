@@ -39,3 +39,20 @@ void __notify_controller_text_input(struct controller *self,
 	b6_notify_observers(&self->observers, controller_observer,
 			    on_text_input, unicode);
 }
+
+void __notify_controller_quit(struct controller *self)
+{
+	b6_notify_observers(&self->observers, controller_observer, on_quit);
+}
+
+void __notify_controller_focus_in(struct controller *self)
+{
+	b6_notify_observers(&self->observers, controller_observer,
+			    on_focus_in);
+}
+
+void __notify_controller_focus_out(struct controller *self)
+{
+	b6_notify_observers(&self->observers, controller_observer,
+			    on_focus_out);
+}
