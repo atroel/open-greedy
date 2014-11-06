@@ -30,11 +30,7 @@ b6_flag(hs, ushort);
 static int fs = 0;
 b6_flag(fs, bool);
 
-#if defined(__linux__)
-static int vs = 0;
-#else
 static int vs = 1;
-#endif
 b6_flag(vs, bool);
 
 B6_REGISTRY_DEFINE(__console_registry);
