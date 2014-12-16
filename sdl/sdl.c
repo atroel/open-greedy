@@ -935,3 +935,8 @@ void register_sdl_clock_source(void)
 	static struct b6_named_clock sdl_named_clock = { .clock = &sdl_clock, };
 	b6_register_named_clock(&sdl_named_clock, "sdl");
 }
+
+const char *get_platform_rw_dir(void)
+{
+	return SDL_GetPrefPath(".", "opengreedy");
+}

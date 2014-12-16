@@ -18,11 +18,6 @@
  */
 
 #include "lib/log.h"
-#include <errno.h>
-#include <shlobj.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <direct.h>
 #include <windows.h>
 
 static char *unicode_to_ascii(const wchar_t *buf, DWORD len, char *p, int n)
@@ -169,28 +164,4 @@ const char *get_platform_user_name(void)
 const char *get_platform_ro_dir(void)
 {
 	return "data";
-}
-
-const char *get_platform_rw_dir(void)
-{
-	static char path[MAX_PATH];
-	char my_documents[MAX_PATH];
-	int len, error;
-	HRESULT result = SHGetFolderPath(NULL, CSIDL_PERSONAL|CSIDL_FLAG_CREATE,
-					 NULL, 0, my_documents);
-	if (result != S_OK) {
-		log_e("error %d when getting path to My Documents",
-		      GetLastError());
-		return NULL;
-	}
-	len = snprintf(path, sizeof(path), "%s/OpenGreedy", my_documents);
-	if (len >= sizeof(path)) {
-		log_e("path is too long");
-		return NULL;
-	}
-	if (_mkdir(path) && EEXIST != (error = errno)) {
-		log_e("error %d when making directory %s", error, path);
-		return NULL;
-	}
-	return path;
 }

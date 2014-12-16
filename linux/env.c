@@ -17,14 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "lib/log.h"
-#include <b6/cmdline.h>
-#include <errno.h>
-#include <pwd.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 const char *get_platform_user_name(void)
@@ -35,26 +27,4 @@ const char *get_platform_user_name(void)
 const char *get_platform_ro_dir(void)
 {
 	return "data";
-}
-
-const char *get_platform_rw_dir(void)
-{
-	static char path[1024];
-	struct passwd *pw;
-	int len, error;
-	pw = getpwuid(getuid());
-	if (!pw || !pw->pw_dir) {
-		log_e("cannot get user's home directory");
-		return NULL;
-	}
-	len = snprintf(path, sizeof(path), "%s/.opengreedy", pw->pw_dir);
-	if (len >= sizeof(path)) {
-		log_e("path is too long");
-		return NULL;
-	}
-	if (mkdir(path, 0755) && EEXIST != (error = errno)) {
-		log_e("error %d when making directory: %s", error, path);
-		return NULL;
-	}
-	return path;
 }
