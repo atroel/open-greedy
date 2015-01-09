@@ -91,47 +91,25 @@ void put_lru_cache(struct lru_cache *self, const char *name, void *userdata)
 	b6_list_add_last(&self->used, &cache_entry->dref);
 }
 
-struct data_entry_inflater {
-	struct ibstream ibs;
-	struct izstream izs;
-	unsigned char buf[2048];
-};
-
-static int initialize_inflater(struct data_entry_inflater *self,
-			       const void *buf, unsigned int len)
-{
-	initialize_ibstream(&self->ibs, buf, len);
-	return initialize_izstream(&self->izs, &self->ibs.istream, &self->buf,
-				   sizeof(self->buf));
-}
-
-static void finalize_inflater(struct data_entry_inflater *self)
-{
-	finalize_izstream(&self->izs);
-}
-
 static void put_buffered_data_entry(struct data_entry *up, struct istream *is)
 {
-	struct izstream *izs = b6_cast_of(is, struct izstream, up);
-	struct data_entry_inflater *inflater = b6_cast_of(
-		izs, struct data_entry_inflater, izs);
-	finalize_inflater(inflater);
-	b6_deallocate(&b6_std_allocator, inflater);
+	struct izbstream *izbs = istream_as_izbstream(is);
+	finalize_izbstream(izbs);
+	b6_deallocate(&b6_std_allocator, izbs);
 }
 
 static struct istream *get_buffered_data_entry(struct data_entry *up)
 {
 	struct buffered_data_entry *self =
 		b6_cast_of(up, struct buffered_data_entry, up);
-	struct data_entry_inflater *inflater =
-		b6_allocate(&b6_std_allocator, sizeof(*inflater));
-	if (!inflater)
+	struct izbstream *izbs;
+	if (!(izbs = b6_allocate(&b6_std_allocator, sizeof(*izbs))))
 		return NULL;
-	if (initialize_inflater(inflater, self->buf, self->len)) {
-		put_buffered_data_entry(up, &inflater->izs.up);
+	if (initialize_izbstream(izbs, self->buf, self->len)) {
+		b6_deallocate(&b6_std_allocator, izbs);
 		return NULL;
 	}
-	return &inflater->izs.up;
+	return izbstream_as_istream(izbs);
 }
 
 int register_buffered_data(struct buffered_data_entry *self, const void *buf,
@@ -169,7 +147,7 @@ static int cached_image_data_ctor(struct image_data *up, void *param)
 {
 	struct cached_image_data *self =
 		b6_cast_of(up, struct cached_image_data, image_data);
-	struct data_entry_inflater inflater;
+	struct izbstream eis;
 	int retval;
 	if (self->shared_rgba.count || self->dref.ref[0]) {
 		b6_list_del(&self->dref);
@@ -194,12 +172,12 @@ static int cached_image_data_ctor(struct image_data *up, void *param)
 		if (dref == b6_list_head(&image_cache))
 			return -1;
 	}
-	if (initialize_inflater(&inflater, self->buffered_data_entry.buf,
-				self->buffered_data_entry.len))
+	if (initialize_izbstream(&eis, self->buffered_data_entry.buf,
+				 self->buffered_data_entry.len))
 		return -1;
 	retval = initialize_rgba_from_tga(&self->shared_rgba.rgba,
-					  &inflater.izs.up);
-	finalize_inflater(&inflater);
+					  izbstream_as_istream(&eis));
+	finalize_izbstream(&eis);
 	if (retval) {
 		log_e("inflating %s failed with error %d",
 		      self->buffered_data_entry.up.entry.name, retval);

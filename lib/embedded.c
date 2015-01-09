@@ -18,41 +18,5 @@
  */
 
 #include "embedded.h"
-#include "log.h"
 
 B6_REGISTRY_DEFINE(__embedded_registry);
-
-int decrunch_embedded(struct embedded *self, struct ostream *ostream)
-{
-	unsigned char zbuf[1024];
-	struct ibstream ibs;
-	struct izstream izs;
-	int error;
-	initialize_ibstream(&ibs, self->buf, self->len);
-	if (initialize_izstream(&izs, &ibs.istream, zbuf, sizeof(zbuf))) {
-		log_e("cannot initialize decompressing stream");
-		return -3;
-	}
-	for (;;) {
-		unsigned char buf[1024];
-		long long int rlen, wlen;
-		rlen = read_istream(&izs.up, buf, sizeof(buf));
-		if (!rlen) {
-			error = 0;
-			break;
-		}
-		if (rlen < 0) {
-			log_w("cannot decompress stream");
-			error = -2;
-			break;
-		}
-		wlen = write_ostream(ostream, buf, rlen);
-		if (rlen > wlen) {
-			log_w("cannot write into stream");
-			error = -2;
-			break;
-		}
-	}
-	finalize_izstream(&izs);
-	return error;
-}

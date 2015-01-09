@@ -262,6 +262,36 @@ extern int initialize_izstream(struct izstream *self, struct istream *istream,
 
 extern void finalize_izstream(struct izstream *self);
 
+struct izbstream {
+	struct ibstream ibs;
+	struct izstream izs;
+	unsigned char buf[2048];
+};
+
+static inline struct istream * izbstream_as_istream(struct izbstream *self)
+{
+	return &self->izs.up;
+}
+
+static inline struct izbstream *istream_as_izbstream(struct istream *up)
+{
+	struct izstream *izs = b6_cast_of(up, struct izstream, up);
+	return b6_cast_of(izs, struct izbstream, izs);
+}
+
+static inline int initialize_izbstream(struct izbstream *self,
+				       const void *buf, unsigned int len)
+{
+	initialize_ibstream(&self->ibs, buf, len);
+	return initialize_izstream(&self->izs, &self->ibs.istream, &self->buf,
+				   sizeof(self->buf));
+}
+
+static inline void finalize_izbstream(struct izbstream *self)
+{
+	finalize_izstream(&self->izs);
+}
+
 /* compress / deflate */
 struct ozstream {
 	struct ostream up;

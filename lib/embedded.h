@@ -43,8 +43,6 @@ struct embedded {
 	unsigned long int uncompressed_len;
 };
 
-extern int decrunch_embedded(struct embedded *self, struct ostream *ostream);
-
 extern struct b6_registry __embedded_registry;
 
 static inline int register_embedded(struct embedded *self, const char *name)
