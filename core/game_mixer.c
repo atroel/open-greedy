@@ -27,12 +27,34 @@
 
 static void start_game_mixer_music(struct state *up)
 {
-	play_music(b6_cast_of(up, struct game_mixer_state, up)->mixer->mixer);
+	struct game_mixer_state *self =
+		b6_cast_of(up, struct game_mixer_state, up);
+	struct game_mixer *mixer = self->mixer;
+	struct istream *is;
+	int retval;
+	mixer->music = 0;
+	if (!(is = get_data(mixer->music_data))) {
+		log_w("cannot get background music stream");
+		return;
+	}
+	if (!(retval = mixer->mixer->ops->load_music_from_stream(mixer->mixer, is))) {
+		mixer->music = 1;
+		play_music(mixer->mixer);
+	} else
+		log_w("could not load background music (%d)", retval);
+	put_data(mixer->music_data, is);
 }
 
 static void stop_game_mixer_music(struct state *up)
 {
-	stop_music(b6_cast_of(up, struct game_mixer_state, up)->mixer->mixer);
+	struct game_mixer_state *self =
+		b6_cast_of(up, struct game_mixer_state, up);
+	struct game_mixer *mixer = self->mixer;
+	if (!mixer->music)
+		return;
+	mixer->music = 0;
+	stop_music(mixer->mixer);
+	unload_music(mixer->mixer);
 }
 
 static void update_game_mixer_music(struct state *up)
@@ -70,7 +92,7 @@ static void game_mixer_on_level_passed(struct game_observer *observer)
 {
 	struct game_mixer *self = to_game_mixer(observer);
 	enqueue_state(&self->passed_music.up, &self->state_queue);
-	hold_game_for(self->game, &self->hold, 2000000ULL);
+	hold_game_for(self->game, &self->hold, 2100000ULL);
 }
 
 static void game_mixer_on_level_failed(struct game_observer *observer)
@@ -318,21 +340,12 @@ int initialize_game_mixer(struct game_mixer *self, struct game *game,
 	};
 	static const struct state_ops state_no_ops = {};
 	const struct state_ops *state_ops;
-	struct istream *is;
-	struct data_entry *data;
 	self->game = game;
 	self->mixer = mixer;
 	self->music = 0;
-	if ((data = lookup_data(skin_name, audio_data_type,
-				GAME_MUSIC_DATA_ID)) && (is = get_data(data))) {
-		int retval = mixer->ops->load_music_from_stream(mixer, is);
-		if (!retval)
-			self->music = 1;
-		else
-			log_w("could not load background music (%d)", retval);
-		put_data(data, is);
-	} else
-		log_w("cannot find background music");
+	if (!(self->music_data = lookup_data(skin_name, audio_data_type,
+					     GAME_MUSIC_DATA_ID)))
+		log_w("cannot find \"%s\" background music", skin_name);
 	LOAD_SAMPLE(self, bonus, skin_name, GAME_SOUND_BONUS_DATA_ID);
 	LOAD_SAMPLE(self, joker, skin_name, GAME_SOUND_JOKER_DATA_ID);
 	LOAD_SAMPLE(self, hunter, skin_name, GAME_SOUND_RETURN_DATA_ID);
@@ -348,14 +361,13 @@ int initialize_game_mixer(struct game_mixer *self, struct game *game,
 	LOAD_SAMPLE(self, honk, skin_name, GAME_SOUND_BOOSTER_FULL_DATA_ID);
 	LOAD_SAMPLE(self, roll, skin_name, GAME_SOUND_CASINO_DATA_ID);
 	LOAD_SAMPLE(self, tranquility, skin_name, GAME_SOUND_WIPEOUT_DATA_ID);
-	if (self->music && is_greedy(skin_name))
+	if (self->music_data && is_greedy(skin_name))
 		state_ops = &secondary_state_ops;
 	else
 		state_ops = &state_no_ops;
 	reset_state_queue(&self->state_queue);
-	reset_game_mixer_state(&self->normal_music,
-			       self->music ? &primary_state_ops : &state_no_ops,
-			       self, 0);
+	reset_game_mixer_state(&self->normal_music, self->music_data ?
+			       &primary_state_ops : &state_no_ops, self, 0);
 	reset_game_mixer_state(&self->passed_music, state_ops, self, 0x12);
 	reset_game_mixer_state(&self->frozen_music, state_ops, self, 0x28);
 	reset_game_mixer_state(&self->afraid_music, state_ops, self, 0x21);

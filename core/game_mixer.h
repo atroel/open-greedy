@@ -48,6 +48,7 @@ struct game_mixer {
 	struct sample *honk;
 	struct sample *roll;
 	struct sample *tranquility;
+	struct data_entry *music_data;
 	int music;
 	struct game_event hold;
 	struct state_queue state_queue;
