@@ -172,5 +172,6 @@ bail_out:
 	if (mixer)
 		close_mixer(mixer);
 	exit_all();
+	log_flush();
 	return retval;
 }
