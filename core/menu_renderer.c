@@ -21,6 +21,9 @@
 
 #include <b6/allocator.h>
 #include <b6/clock.h>
+#include <b6/json.h>
+#include <b6/utf8.h>
+
 #include "lib/std.h"
 #include "menu_phase.h"
 #include "data.h"
@@ -187,10 +190,18 @@ static void menu_entry_renderer_on_render(struct renderer_observer *obs)
 	hide_toolkit_label(&self->label[!selected]);
 }
 
-static unsigned long int text_len(const char *text)
+static unsigned int text_len(const unsigned char *utf8, unsigned int size)
 {
-	unsigned long int len;
-	for (len = 0; *text; text += 1, len += 1);
+	unsigned int len;
+	for (len = 0; size; len += 1) {
+		int n = b6_utf8_dec_len(utf8);
+		if (n <= 0)
+			break;
+		if (n > size)
+			break;
+		utf8 += n;
+		size -= n;
+	}
 	return len;
 }
 
@@ -200,23 +211,25 @@ static void initialize_menu_entry_renderer(struct menu_entry_renderer *self,
 					   struct renderer_base *base,
 					   const struct fixed_font *normal_font,
 					   const struct fixed_font *bright_font,
-					   float x, float y, const char *text)
+					   float x, float y,
+					   const void *utf8_data,
+					   unsigned int utf8_size)
 {
 	static const struct renderer_observer_ops renderer_observer_ops = {
 		.on_render = menu_entry_renderer_on_render,
 	};
-	unsigned long int len = text_len(text);
+	unsigned long int len = text_len(utf8_data, utf8_size);
 	unsigned short int font_w = get_fixed_font_width(normal_font);
 	unsigned short int font_h = get_fixed_font_height(normal_font);
 	initialize_toolkit_label(&self->label[0], renderer, normal_font,
 				 len * font_w, font_h, base,
 				 x - len * 16 / 2, y, len * 16, 16);
-	set_toolkit_label(&self->label[0], text);
+	set_toolkit_label_utf8(&self->label[0], utf8_data, utf8_size);
 	enable_toolkit_label_shadow(&self->label[0]);
 	initialize_toolkit_label(&self->label[1], renderer, bright_font,
 				 len * font_w, font_h, base,
 				 x - len * 16 / 2, y, len * 16, 16);
-	set_toolkit_label(&self->label[1], text);
+	set_toolkit_label_utf8(&self->label[1], utf8_data, utf8_size);
 	enable_toolkit_label_shadow(&self->label[1]);
 	hide_toolkit_label(&self->label[1]);
 	self->clock = clock;
@@ -348,7 +361,9 @@ static int initialize_menu_renderer_entries(struct menu_renderer *self)
 					       self->renderer, root,
 					       &self->normal_font,
 					       &self->bright_font,
-					       x, y, entry->text);
+					       x, y,
+					       entry->utf8_data,
+					       entry->utf8_size);
 		y += 40;
 	}
 	return 0;

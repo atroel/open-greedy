@@ -21,11 +21,14 @@
 #include <stdlib.h>
 #include <b6/clock.h>
 #include <b6/cmdline.h>
+#include <b6/json.h>
 #include "core/console.h"
 #include "core/mixer.h"
 #include "core/engine.h"
+#include "core/json.h"
 #include "core/game.h"
 #include "core/renderer.h"
+#include "lib/embedded.h"
 #include "lib/init.h"
 #include "lib/log.h"
 #include "lib/rng.h"
@@ -123,15 +126,80 @@ static int z2d(struct b6_cmd *cmd, int argc, char *argv[])
 }
 b6_cmd(z2d);
 
-int main(int argc, char *argv[])
+static struct b6_json_object *get_embedded_lang(struct b6_json *json)
+{
+	struct b6_json_object *lang = NULL;
+	struct embedded *embedded = NULL;
+	struct izbstream izbs;
+	struct json_istream jis;
+	struct b6_json_parser_info info;
+	enum b6_json_error error;
+	if (!(embedded = lookup_embedded("lang.json")))
+		return NULL;
+	if (initialize_izbstream(&izbs, embedded->buf, embedded->len))
+		return NULL;
+	setup_json_istream(&jis, izbstream_as_istream(&izbs));
+	info.row = info.col = 0;
+	b6_json_reset_parser_info(&info);
+	if (!(lang = b6_json_new_object(json)))
+		log_e("out of memory");
+	else if ((error = b6_json_parse_object(lang, &jis.up, &info))) {
+		log_e("json parsing failed (%d): row=%d col=%d", error,
+		      info.row, info.col);
+		b6_json_unref_value(&lang->up);
+		lang = NULL;
+	}
+	finalize_izbstream(&izbs);
+	return lang;
+}
+
+static int greedy(struct b6_clock *clock)
 {
 	int retval = EXIT_FAILURE;
 	struct console *console = NULL;
 	struct mixer *mixer = NULL;
-	struct b6_named_clock *clock_source = NULL;
+	struct b6_json *json = NULL;
+	struct b6_json_object *lang = NULL;
 	struct engine engine;
+	puts("Open Greedy - Copyright (C) 2014 Arnaud TROEL");
+	puts("This program comes with ABSOLUTELY NO WARRANTY.");
+	puts("This is free software, and you are welcome to redistribute it");
+	puts("under certain conditions; see COPYING file for details.");
+	fprintf(stderr, "Build: %s-%s-v%s\n", PLATFORM, BUILD, VERSION);
+	init_all();
+	if (!(console = lookup_console(console_name))) {
+		log_e("unknown console: %s", console_name);
+		goto bail_out;
+	}
+	log_i("using %s console", console_name);
+	mixer = lookup_mixer("sdl");
+	if (open_mixer(mixer))
+		goto bail_out;
+	if (!(json = get_json()))
+		goto bail_out;
+	if (!(lang = get_embedded_lang(json)))
+		goto bail_out;
+	reset_random_number_generator(b6_get_clock_time(clock));
+	if (!setup_engine(&engine, clock, console, mixer, lang)) {
+		run_engine(&engine);
+		retval = EXIT_SUCCESS;
+	}
+bail_out:
+	if (lang)
+		b6_json_unref_value(&lang->up);
+	if (json)
+		put_json(json);
+	if (mixer)
+		close_mixer(mixer);
+	exit_all();
+	return retval;
+}
+
+int main(int argc, char *argv[])
+{
 	struct b6_cmd *cmd;
-	int argn;
+	int argn, retval;
+	struct b6_named_clock *clock_source = NULL;
 	install_crash_pad();
 	argn = b6_parse_command_line_flags(argc, argv, 0);
 	if (log_flag)
@@ -144,34 +212,16 @@ int main(int argc, char *argv[])
 		}
 	if (clock_name && !(clock_source = b6_lookup_named_clock(clock_name)))
 		log_e("cannot find clock %s", clock_name);
-	if (!(clock_source = b6_get_default_named_clock()))
+	if (!clock_source && !(clock_source = b6_get_default_named_clock()))
 		log_p("cannot find a default clock");
+	log_clock = clock_source->clock;
+	log_i("using %s clock source", clock_source->entry.name);
 	if (argn <= 0)
 		log_p("error parsing command line");
 	if (argn < argc && (cmd = b6_lookup_cmd(argv[argn])))
-		return b6_exec_cmd(cmd, argc - argn, argv + argn);
-	log_clock = clock_source->clock;
-	log_i("using %s clock source", clock_source->entry.name);
-	puts("Open Greedy - Copyright (C) 2014 Arnaud TROEL");
-	puts("This program comes with ABSOLUTELY NO WARRANTY.");
-	puts("This is free software, and you are welcome to redistribute it");
-	puts("under certain conditions; see COPYING file for details.");
-	fprintf(stderr, "Build: %s-%s-v%s\n", PLATFORM, BUILD, VERSION);
-	init_all();
-	if (!(console = lookup_console(console_name)))
-		log_p("unknown console: %s", console_name);
-	log_i("using %s console", console_name);
-	mixer = lookup_mixer("sdl");
-	if (open_mixer(mixer))
-		goto bail_out;
-	setup_engine(&engine, clock_source->clock, console, mixer);
-	reset_random_number_generator(b6_get_clock_time(engine.clock));
-	run_engine(&engine);
-	retval = EXIT_SUCCESS;
-bail_out:
-	if (mixer)
-		close_mixer(mixer);
-	exit_all();
+		retval = b6_exec_cmd(cmd, argc - argn, argv + argn);
+	else
+		retval = greedy(clock_source->clock);
 	log_flush();
 	return retval;
 }

@@ -70,7 +70,6 @@ struct game_renderer_info {
 	struct game_renderer *game_renderer;
 	struct renderer_texture *texture;
 	struct renderer_texture *icon_texture;
-	const char *text;
 	unsigned long long int expire;
 };
 
@@ -98,7 +97,7 @@ struct game_renderer_jewels {
 	struct linear linear;
 };
 
-struct lang;
+struct b6_json_object;
 
 struct game_renderer {
 	struct game_observer game_observer;
@@ -191,7 +190,7 @@ extern int initialize_game_renderer(struct game_renderer *self,
 				    const struct b6_clock *clock,
 				    struct game *game,
 				    const char *skin_id,
-				    const struct lang *lang);
+				    const struct b6_json_object *lang);
 
 extern void finalize_game_renderer(struct game_renderer *self);
 

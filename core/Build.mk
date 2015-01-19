@@ -21,5 +21,6 @@ libs+=lib.a
 lib.a:=controller.o game.o game_controller.o game_mixer.o game_renderer.o \
 	ghosts.o items.o level.o menu.o menu_controller.o menu_mixer.o \
 	menu_renderer.o mixer.o mobile.o pacman.o renderer.o rgba.o data.o \
-	toolkit.o engine.o game_phase.o menu_phase.o lang.o hall_of_fame.o \
+	toolkit.o engine.o game_phase.o menu_phase.o hall_of_fame.o \
 	hall_of_fame_phase.o console.o fade_io.o credits_phase.o env.o
+lib.a+=json.o lang.json.data.o

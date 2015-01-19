@@ -25,7 +25,8 @@
 
 struct menu_entry {
 	struct b6_dref dref;
-	const char *text;
+	const void *utf8_data;
+	unsigned int utf8_size;
 	void *cookie;
 };
 

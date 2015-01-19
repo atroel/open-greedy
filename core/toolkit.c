@@ -19,6 +19,7 @@
 
 #include "toolkit.h"
 
+#include <b6/utf8.h>
 #include <b6/utils.h>
 
 #include "renderer.h"
@@ -55,6 +56,22 @@ static unsigned short int get_fixed_font_text_width(const struct fixed_font *f,
 	return w;
 }
 
+static unsigned short int get_fixed_font_text_width_utf8(
+	const struct fixed_font *f,
+	const void *u,
+	unsigned int n)
+{
+	const unsigned char *s = u;
+	unsigned short int w = 0;
+	while (n--) {
+		const int i = *s++ - ' ';
+		if (i < 0 || i >= b6_card_of(f->rgba))
+			continue;
+		w += f->rgba[i].w;
+	}
+	return w;
+}
+
 void render_fixed_font(const struct fixed_font *self, const char *s,
 		       struct rgba *rgba,
 		       unsigned short int x, unsigned short int y)
@@ -64,6 +81,28 @@ void render_fixed_font(const struct fixed_font *self, const char *s,
 		const struct rgba *from = &self->rgba[i];
 		if (i < 0 || i >= b6_card_of(self->rgba))
 			continue;
+		copy_rgba(from, 0, 0, from->w, from->h, rgba, x, y);
+		x += from->w;
+	}
+}
+
+void render_fixed_font_utf8(const struct fixed_font *self, const void *s,
+			    unsigned int n, struct rgba *rgba,
+			    unsigned short int x, unsigned short int y)
+{
+	const unsigned char *p = s;
+	while (n--) {
+		int i;
+		const struct rgba *from;
+		unsigned int len = b6_utf8_dec_len(p);
+		if (len > 1) {
+			p += len;
+			continue;
+		}
+		i = *p++ - ' ';
+		if (i < 0 || i >= b6_card_of(self->rgba))
+			continue;
+		from = &self->rgba[i];
 		copy_rgba(from, 0, 0, from->w, from->h, rgba, x, y);
 		x += from->w;
 	}
@@ -160,6 +199,25 @@ int set_toolkit_label(struct toolkit_label *self, const char *text)
 	if (x < 0 || y < 0)
 		return -1;
 	render_fixed_font(self->font, text, &self->rgba, x / 2, y / 2);
+	update_renderer_texture(self->image[0].texture, &self->rgba);
+	if (self->image[1].texture) {
+		make_shadow_rgba(&self->rgba);
+		update_renderer_texture(self->image[1].texture, &self->rgba);
+	}
+	return 0;
+}
+
+int set_toolkit_label_utf8(struct toolkit_label *self, const void *utf8,
+			   unsigned int len)
+{
+	int x, y;
+	if (!self->font)
+		return 0;
+	x = self->rgba.w - get_fixed_font_text_width_utf8(self->font, utf8, len);
+	y = self->rgba.h - get_fixed_font_height(self->font);
+	if (x < 0 || y < 0)
+		return -1;
+	render_fixed_font_utf8(self->font, utf8, len, &self->rgba, x / 2, y / 2);
 	update_renderer_texture(self->image[0].texture, &self->rgba);
 	if (self->image[1].texture) {
 		make_shadow_rgba(&self->rgba);

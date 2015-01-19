@@ -19,11 +19,13 @@
 
 #include "game_renderer.h"
 
+#include <b6/json.h>
+#include <b6/utf8.h>
+
 #include "lib/std.h"
 
 #include "game.h"
 #include "game_phase.h"
-#include "lang.h"
 #include "data.h"
 #include "renderer.h"
 
@@ -238,27 +240,46 @@ static const struct state_ops volatile_info_ops = {
 
 static int initialize_game_renderer_info(struct game_renderer_info *self,
 					 struct game_renderer *game_renderer,
-					 struct rgba *rgba, const char *text,
+					 struct rgba *rgba,
+					 const struct b6_json_string *text,
 					 const char *data_id,
 					 const struct state_ops *ops)
 {
-	int x;
 	unsigned short int font_w, font_h;
-	const char *p;
+	const void *utf8;
+	unsigned int size, n;
+	const unsigned char *p;
+	int x;
 	self->texture = self->icon_texture = NULL;
 	font_w = get_fixed_font_width(&game_renderer->font);
 	font_h = get_fixed_font_height(&game_renderer->font);
 	if (font_h + 1 > rgba->h)
 		return 0;
-	for (p = text, x = rgba->w; *p++; x -= font_w)
+	clear_rgba(rgba, 0xff000000);
+	if (text) {
+		utf8 = b6_json_string_utf8(text);
+		size = b6_json_string_size(text);
+		p = utf8;
+		n = size;
+		x = rgba->w;
+		for (;;) {
+			int len = b6_utf8_dec_len(p);
+			if (len <= 0)
+				break;
+			x -= font_w;
+			if (n <= len)
+				break;
+			p += len;
+			n -= len;
+		}
 		if (x < 0)
 			return 0;
-	clear_rgba(rgba, 0xff000000);
-	render_fixed_font(&game_renderer->font, text, rgba, x / 2, 1);
+		render_fixed_font_utf8(&game_renderer->font, utf8, size,
+				       rgba, x / 2, 1);
+	}
 	self->texture = create_renderer_texture(game_renderer->renderer, rgba);
 	self->icon_texture = make_texture(game_renderer->renderer,
 					  game_renderer->skin_id, data_id);
-	self->text = text;
 	self->game_renderer = game_renderer;
 	reset_state(&self->up, ops);
 	return 0;
@@ -487,17 +508,19 @@ static void finalize_game_renderer_sprite(struct game_renderer_sprite *self)
 
 static int initialize_game_renderer_casino(struct game_renderer_casino *self,
 					   struct game_renderer *game_renderer,
-					   const struct lang *lang,
+					   const struct b6_json_object *lang,
 					   struct rgba *scratch)
 {
 	struct data_entry *entry;
 	struct image_data *data;
+	struct b6_json_string *text;
 	int i;
 	if ((initialize_rgba(&self->rgba, scratch->w, scratch->h)))
 		return -1;
 	clear_rgba(&self->rgba, 0xff000000);
+	text = b6_json_get_object_as(lang, "casino", string);
 	initialize_game_renderer_info(&self->game_renderer_info, game_renderer,
-				      &self->rgba, lang->game.casino,
+				      &self->rgba, text,
 				      GAME_INFO_CASINO_DATA_ID,
 				      &sticky_info_ops);
 	self->roll_image.p = NULL;
@@ -1449,7 +1472,7 @@ static void destroy_points_popup(struct game_renderer *self)
 }
 
 static int create_panel(struct game_renderer *self, struct renderer_base *base,
-			const struct lang *lang)
+			const struct b6_json_object *lang)
 {
 	struct rgba scratch;
 	unsigned short int font_w, font_h;
@@ -1473,107 +1496,128 @@ static int create_panel(struct game_renderer *self, struct renderer_base *base,
 	initialize_game_renderer_jewels(&self->jewels, self, base);
 	initialize_rgba(&scratch, 224, 18);
 	initialize_game_renderer_info(
-		&self->get_ready_info, self, &scratch, lang->game.get_ready,
+		&self->get_ready_info, self, &scratch,
+		b6_json_get_object_as(lang, "get_ready", string),
 		GAME_INFO_WIPEOUT_DATA_ID, &sticky_info_ops);
 	initialize_game_renderer_info(
-		&self->paused_info, self, &scratch, lang->game.paused,
+		&self->paused_info, self, &scratch,
+		b6_json_get_object_as(lang, "paused", string),
 		GAME_INFO_WIPEOUT_DATA_ID, &sticky_info_ops);
 	initialize_game_renderer_info(
-		&self->try_again_info, self, &scratch, lang->game.try_again,
+		&self->try_again_info, self, &scratch,
+		b6_json_get_object_as(lang, "try_again", string),
 		GAME_INFO_DEATH_DATA_ID, &sticky_info_ops);
 	initialize_game_renderer_info(
-		&self->game_over_info, self, &scratch, lang->game.game_over,
+		&self->game_over_info, self, &scratch,
+		b6_json_get_object_as(lang, "game_over", string),
 		GAME_INFO_DEATH_DATA_ID, &sticky_info_ops);
 	initialize_game_renderer_info(
-		&self->happy_hour_info, self, &scratch, lang->game.happy_hour,
+		&self->happy_hour_info, self, &scratch,
+		b6_json_get_object_as(lang, "happy_hour", string),
 		GAME_INFO_X2_DATA_ID, &standard_info_ops);
 	initialize_game_renderer_info(
 		&self->bullet_proof_info, self, &scratch,
-		lang->game.bullet_proof,
+		b6_json_get_object_as(lang, "bullet_proof", string),
 		GAME_INFO_INVINCIBLE_DATA_ID, &standard_info_ops);
 	initialize_game_renderer_info(
-		&self->freeze_info, self, &scratch, lang->game.freeze,
+		&self->freeze_info, self, &scratch,
+		b6_json_get_object_as(lang, "freeze", string),
 		GAME_INFO_LOCKDOWN_DATA_ID, &standard_info_ops);
 	initialize_game_renderer_info(
 		&self->eat_the_ghosts_info, self, &scratch,
-		lang->game.eat_the_ghosts,
+		b6_json_get_object_as(lang, "eat_the_ghosts", string),
 		GAME_INFO_SUPER_PACGUM_DATA_ID, &standard_info_ops);
 	initialize_game_renderer_info(
-		&self->extra_life_info, self, &scratch, lang->game.extra_life,
+		&self->extra_life_info, self, &scratch,
+		b6_json_get_object_as(lang, "extra_life", string),
 		GAME_INFO_LIFE_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
 		&self->empty_shield_info, self, &scratch,
-		lang->game.empty_shield, GAME_INFO_EMPTY_DATA_ID,
-		&volatile_info_ops);
+		b6_json_get_object_as(lang, "empty_shield", string),
+		GAME_INFO_EMPTY_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
 		&self->shift_shield_info, self, &scratch,
-		lang->game.shield_pickup,
+		b6_json_get_object_as(lang, "shield_pickup", string),
 		GAME_INFO_SHIELD_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
 		&self->level_complete_info, self, &scratch,
-		lang->game.level_complete,
+		b6_json_get_object_as(lang, "level_complete", string),
 		GAME_INFO_COMPLETE_DATA_ID, &sticky_info_ops);
 	initialize_game_renderer_info(
-		&self->next_level_info, self, &scratch, lang->game.next_level,
+		&self->next_level_info, self, &scratch,
+		b6_json_get_object_as(lang, "next_level", string),
 		GAME_INFO_FORWARD_DATA_ID, &sticky_info_ops);
 	initialize_game_renderer_info(
 		&self->previous_level_info, self, &scratch,
-		lang->game.previous_level,
+		b6_json_get_object_as(lang, "previous_level", string),
 		GAME_INFO_REWIND_DATA_ID, &sticky_info_ops);
 	initialize_game_renderer_info(
-		&self->slow_ghosts_info, self, &scratch, lang->game.slow_ghosts,
+		&self->slow_ghosts_info, self, &scratch,
+		b6_json_get_object_as(lang, "slow_ghosts", string),
 		GAME_INFO_GHOSTS_SLOW_DATA_ID, &standard_info_ops);
 	initialize_game_renderer_info(
-		&self->fast_ghosts_info, self, &scratch, lang->game.fast_ghosts,
+		&self->fast_ghosts_info, self, &scratch,
+		b6_json_get_object_as(lang, "fast_ghosts", string),
 		GAME_INFO_GHOSTS_FAST_DATA_ID, &standard_info_ops);
 	initialize_game_renderer_info(
-		&self->slow_pacman_info, self, &scratch, lang->game.speed_slow,
+		&self->slow_pacman_info, self, &scratch,
+		b6_json_get_object_as(lang, "speed_slow", string),
 		GAME_INFO_PACMAN_SLOW_DATA_ID, &standard_info_ops);
 	initialize_game_renderer_info(
-		&self->fast_pacman_info, self, &scratch, lang->game.speed_fast,
+		&self->fast_pacman_info, self, &scratch,
+		b6_json_get_object_as(lang, "speed_fast", string),
 		GAME_INFO_PACMAN_FAST_DATA_ID, &standard_info_ops);
 	initialize_game_renderer_info(
 		&self->single_booster_info, self, &scratch,
-		lang->game.single_booster,
+		b6_json_get_object_as(lang, "single_booster", string),
 		GAME_INFO_SINGLE_BOOSTER_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
 		&self->double_booster_info, self, &scratch,
-		lang->game.double_booster,
+		b6_json_get_object_as(lang, "double_booster", string),
 		GAME_INFO_DOUBLE_BOOSTER_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
 		&self->full_booster_info, self, &scratch,
-		lang->game.booster_full,
+		b6_json_get_object_as(lang, "booster_full", string),
 		GAME_INFO_DOUBLE_BOOSTER_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
 		&self->empty_booster_info, self, &scratch,
-		lang->game.booster_empty,
+		b6_json_get_object_as(lang, "booster_empty", string),
 		GAME_INFO_EMPTY_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
-		&self->wiped_out_info, self, &scratch, lang->game.wiped_out,
+		&self->wiped_out_info, self, &scratch,
+		b6_json_get_object_as(lang, "wiped_out", string),
 		GAME_INFO_WIPEOUT_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
-		&self->jewel_info[0], self, &scratch, lang->game.bonus_200,
+		&self->jewel_info[0], self, &scratch,
+		b6_json_get_object_as(lang, "bonus_200", string),
 		GAME_INFO_JEWEL1_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
-		&self->jewel_info[1], self, &scratch, lang->game.bonus_200,
+		&self->jewel_info[1], self, &scratch,
+		b6_json_get_object_as(lang, "bonus_200", string),
 		GAME_INFO_JEWEL2_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
-		&self->jewel_info[2], self, &scratch, lang->game.bonus_200,
+		&self->jewel_info[2], self, &scratch,
+		b6_json_get_object_as(lang, "bonus_200", string),
 		GAME_INFO_JEWEL3_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
-		&self->jewel_info[3], self, &scratch, lang->game.bonus_200,
+		&self->jewel_info[3], self, &scratch,
+		b6_json_get_object_as(lang, "bonus_200", string),
 		GAME_INFO_JEWEL4_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
-		&self->jewel_info[4], self, &scratch, lang->game.bonus_200,
+		&self->jewel_info[4], self, &scratch,
+		b6_json_get_object_as(lang, "bonus_200", string),
 		GAME_INFO_JEWEL5_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
-		&self->jewel_info[5], self, &scratch, lang->game.bonus_200,
+		&self->jewel_info[5], self, &scratch,
+		b6_json_get_object_as(lang, "bonus_200", string),
 		GAME_INFO_JEWEL6_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
-		&self->jewel_info[6], self, &scratch, lang->game.bonus_200,
+		&self->jewel_info[6], self, &scratch,
+		b6_json_get_object_as(lang, "bonus_200", string),
 		GAME_INFO_JEWEL7_DATA_ID, &volatile_info_ops);
 	initialize_game_renderer_info(
-		&self->diet_info, self, &scratch, lang->game.dieting,
+		&self->diet_info, self, &scratch,
+		b6_json_get_object_as(lang, "dieting", string),
 		GAME_INFO_DIET_DATA_ID, &standard_info_ops);
 	initialize_game_renderer_casino(&self->casino, self, lang, &scratch);
 	finalize_rgba(&scratch);
@@ -1650,7 +1694,7 @@ int initialize_game_renderer(struct game_renderer *self,
 			     struct renderer *renderer,
 			     const struct b6_clock *clock, struct game *game,
 			     const char *skin_id,
-			     const struct lang *lang)
+			     const struct b6_json_object *lang)
 {
 	static const struct game_observer_ops game_observer_ops = {
 		.on_game_paused = on_game_paused,

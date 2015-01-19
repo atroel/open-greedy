@@ -21,11 +21,12 @@
 #include "data.h"
 #include "engine.h"
 #include "game.h"
-#include "lang.h"
+#include "json.h"
 #include "level.h"
 #include "mixer.h"
 #include "renderer.h"
 
+#include "lib/embedded.h"
 #include <b6/cmdline.h>
 
 static const char *game = "Greedy XP";
@@ -63,19 +64,62 @@ static void on_focus_out(struct controller_observer *observer)
 	suspend_mixer(self->mixer);
 }
 
-void setup_engine(struct engine *self, const struct b6_clock *clock,
-		  struct console *console, struct mixer *mixer)
+const struct b6_json_object *rotate_engine_language(struct engine *self)
+{
+	const struct b6_json_pair *pair;
+	b6_json_advance_iterator(&self->iter);
+	if (!b6_json_get_iterator(&self->iter))
+		b6_json_setup_iterator(&self->iter, self->languages);
+	while ((pair = b6_json_get_iterator(&self->iter))) {
+		if (b6_json_value_is_of(pair->value, object))
+			break;
+		b6_json_advance_iterator(&self->iter);
+	}
+	return get_engine_language(self);
+}
+
+static int setup_engine_language(struct engine *self,
+				 struct b6_json_object *languages)
+{
+	const struct b6_json_pair *pair;
+	self->languages = languages;
+	b6_json_setup_iterator_at(&self->iter, languages, lang);
+	pair = b6_json_get_iterator(&self->iter);
+	if (pair && b6_json_value_is_of(pair->value, object))
+		return 0;
+	log_w("cannot find \"%s\" language", lang);
+	b6_json_setup_iterator_at(&self->iter, languages, "en");
+	pair = b6_json_get_iterator(&self->iter);
+	if (pair && b6_json_value_is_of(pair->value, object)) {
+		log_i("falling back to \"en\" language", lang);
+		return 0;
+	}
+	log_w("cannot find fallback language");
+	b6_json_setup_iterator(&self->iter, languages);
+	while ((pair = b6_json_get_iterator(&self->iter))) {
+		if (b6_json_value_is_of(pair->value, object))
+			return 0;
+		b6_json_advance_iterator(&self->iter);
+	}
+	return -1;
+}
+
+int setup_engine(struct engine *self, const struct b6_clock *clock,
+		 struct console *console, struct mixer *mixer,
+		 struct b6_json_object *languages)
 {
 	static const struct controller_observer_ops ops = {
 		.on_quit = on_quit,
 		.on_focus_in = on_focus_in,
 		.on_focus_out = on_focus_out,
 	};
+	int retval;
 	setup_controller_observer(&self->observer, &ops);
 	self->clock = clock;
 	self->console = console;
 	self->mixer = mixer;
-	self->lang = lookup_lang(lang);
+	if ((retval = setup_engine_language(self, languages)))
+		return retval;
 	if (!(self->layout_provider = lookup_layout_provider(game))) {
 		self->layout_provider = get_default_layout_provider();
 		b6_check(self->layout_provider);
@@ -92,6 +136,7 @@ void setup_engine(struct engine *self, const struct b6_clock *clock,
 	self->game_result.score = 0ULL;
 	self->game_result.level = 0ULL;
 	self->curr = lookup_phase("menu");
+	return 0;
 }
 
 void reset_engine(struct engine *self)

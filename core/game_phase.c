@@ -31,6 +31,7 @@
 
 #include <b6/clock.h>
 #include <b6/cmdline.h>
+#include <b6/json.h>
 
 struct game_phase {
 	struct phase up;
@@ -56,6 +57,7 @@ static int game_phase_init(struct phase *up)
 {
 	struct game_phase *self = to_game_phase(up);
 	const char *skin_id = game_skin ? game_skin : get_skin_id();
+	struct b6_json_object *lang;
 	int retval;
 	b6_setup_cached_clock(&self->clock, up->engine->clock);
 	if ((retval = initialize_game(&self->game, &self->clock.up,
@@ -64,10 +66,15 @@ static int game_phase_init(struct phase *up)
 		log_e("cannot initialize game (%d)", retval);
 		goto fail_game;
 	}
+	if (!(lang = b6_json_get_object_as(get_engine_language(up->engine),
+					   "game", object))) {
+		log_e("cannot find game text");
+		goto fail_renderer;
+	}
 	if ((retval = initialize_game_renderer(&self->renderer,
 					       get_engine_renderer(up->engine),
 					       &self->clock.up, &self->game,
-					       skin_id, up->engine->lang))) {
+					       skin_id, lang))) {
 		log_e("cannot initialize game renderer (%d)", retval);
 		goto fail_renderer;
 	}

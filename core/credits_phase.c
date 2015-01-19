@@ -24,7 +24,7 @@
 #include "console.h"
 #include "controller.h"
 #include "engine.h"
-#include "lang.h"
+#include "json.h"
 #include "mixer.h"
 #include "data.h"
 #include "toolkit.h"
@@ -117,6 +117,7 @@ struct credits_phase {
 	struct credits_phase_pacman pacman;
 	struct renderer_base *labels_base;
 	struct toolkit_label lines[30];
+	unsigned long int nlines;
 	int music;
 	struct controller_observer controller_observer;
 	struct phase *next;
@@ -139,14 +140,22 @@ static int credits_phase_init(struct phase *up)
 	struct credits_phase *self = b6_cast_of(up, struct credits_phase, up);
 	struct renderer *renderer = get_engine_renderer(up->engine);
 	struct renderer_base *root = get_renderer_base(renderer);
+	const struct b6_json_array *array;
 	struct data_entry *data;
 	struct istream *istream;
 	unsigned short int font_w, font_h;
+	float y;
 	int i;
 	if (make_font(&self->font, credits_skin, CREDITS_FONT_DATA_ID))
 		return -1;
 	font_w = get_fixed_font_width(&self->font);
 	font_h = get_fixed_font_height(&self->font);
+	if (!(array = b6_json_get_object_as(get_engine_language(up->engine),
+					    "credits", array))) {
+		log_e("cannot find credits text");
+		finalize_fixed_font(&self->font);
+		return -1;
+	}
 	if ((self->background = create_renderer_tile(renderer, root, 0, 0,
 						     640, 480, NULL)))
 		set_renderer_tile_texture(self->background, make_texture(
@@ -155,16 +164,30 @@ static int credits_phase_init(struct phase *up)
 					up->engine->clock, 0, 0, 640, 480);
 	self->labels_base = create_renderer_base_or_die(renderer, root,
 							"labels", 0, 0);
-	for (i = 0; i < b6_card_of(self->lines); i += 1) {
-		const unsigned short int u = 2 + 52 * font_w, v = 2 + font_h;
-		const float x = 8, y = i * 16;
+	self->nlines = b6_json_array_len(array);
+	if (self->nlines > b6_card_of(self->lines)) {
+		log_w("discarding extraneous lines (%u vs %u)",
+		      self->nlines, b6_card_of(self->lines));
+		self->nlines = b6_card_of(self->lines);
+	}
+	y = 240 - self->nlines * 8;
+	for (i = 0; i < self->nlines; i += 1) {
+		const unsigned short int u = 2 + 52 * font_w;
+		const unsigned short int v = 2 + font_h;
 		const float w = 2 + 52 * 12, h = 2 + 16;
-		const char *text = up->engine->lang->credits.lines[i];
-		initialize_toolkit_label(&self->lines[i], renderer, &self->font,
-					 u, v, self->labels_base, x, y, w, h);
+		struct b6_json_string *text;
+		initialize_toolkit_label(&self->lines[i], renderer,
+					 &self->font, u, v,
+					 self->labels_base, 8, y, w, h);
+		y += 16;
 		enable_toolkit_label_shadow(&self->lines[i]);
-		if (text)
-			set_toolkit_label(&self->lines[i], text);
+		text = b6_json_value_as_or_null(b6_json_get_array(array, i),
+						string);
+		if (!text)
+			continue;
+		set_toolkit_label_utf8(&self->lines[i],
+				       b6_json_string_utf8(text),
+				       b6_json_string_size(text));
 	}
 	if ((data = lookup_data(credits_skin, audio_data_type,
 				CREDITS_MUSIC_DATA_ID)) &&
@@ -193,7 +216,7 @@ static void credits_phase_exit(struct phase *up)
 		stop_music(up->engine->mixer);
 		unload_music(up->engine->mixer);
 	}
-	for (i = 0; i < b6_card_of(self->lines); i += 1)
+	for (i = 0; i < self->nlines; i += 1)
 		finalize_toolkit_label(&self->lines[i]);
 	destroy_renderer_base(self->labels_base);
 	finalize_credits_phase_pacman(&self->pacman);
