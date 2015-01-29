@@ -17,16 +17,17 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-LDFLAGS-embed+=-lz
+cflags-sdl2?=$(shell sdl2-config --cflags)
+ldflags-sdl2?=$(shell sdl2-config --libs)
 
-CFLAGS-greedy+=`sdl2-config --cflags`
-LDFLAGS-greedy+=`sdl2-config --libs`
-LDFLAGS-greedy+=-lGL
-LDFLAGS-greedy+=-lSDL2
-LDFLAGS-greedy+=-lSDL2_mixer
-LDFLAGS-greedy+=-lz
+cflags-greedy+=$(cflags-sdl2)
+ldflags-greedy+=$(ldflags-sdl2)
+ldflags-greedy+=-lGL
+ldflags-greedy+=-lSDL2
+ldflags-greedy+=-lSDL2_mixer
 
-EXTRA_CFLAGS+=-I$(SROOT)/linux
-EXTRA_LDFLAGS+=-rdynamic # for backtrace
+cflags+=-I$(CURDIR)/linux
+ldflags+=-rdynamic # for backtrace
+ldflags+=-lz
 
 greedy+=linux/ posix/

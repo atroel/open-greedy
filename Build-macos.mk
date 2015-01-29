@@ -17,20 +17,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-LDFLAGS-embed+=-lz
+cflags-greedy+=-F${HOME}/Library/Frameworks
+cflags-greedy+=-I${HOME}/Library/Frameworks/SDL2.framework/Headers
+cflags-greedy+=-I${HOME}/Library/Frameworks/SDL2_mixer.framework/Headers
+ldflags-greedy+=-F${HOME}/Library/Frameworks
+ldflags-greedy+=-framework SDL2
+ldflags-greedy+=-framework SDL2_mixer
+ldflags-greedy+=-framework OpenGL
+ldflags-greedy+=-framework CoreServices
+ldflags-greedy+=-Wl,-rpath,@loader_path/../Frameworks
 
-CFLAGS-greedy+=-F${HOME}/Library/Frameworks
-CFLAGS-greedy+=-I${HOME}/Library/Frameworks/SDL2.framework/Headers
-CFLAGS-greedy+=-I${HOME}/Library/Frameworks/SDL2_mixer.framework/Headers
-LDFLAGS-greedy+=-F${HOME}/Library/Frameworks
-LDFLAGS-greedy+=-framework SDL2
-LDFLAGS-greedy+=-framework SDL2_mixer
-LDFLAGS-greedy+=-framework OpenGL
-LDFLAGS-greedy+=-framework CoreServices
-LDFLAGS-greedy+=-lz
-LDFLAGS-greedy+=-Wl,-rpath,@loader_path/../Frameworks
-
-EXTRA_CFLAGS+=-I$(SROOT)/macos
-EXTRA_LDFLAGS+=-rdynamic # for backtrace
+cflags+=-I$(CURDIR)/macos
+ldflags+=-rdynamic # for backtrace
+ldflags+=-lz
 
 greedy+=posix/ macos/
