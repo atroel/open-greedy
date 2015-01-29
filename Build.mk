@@ -33,27 +33,15 @@ endif
 endif
 endif
 
-CFLAGS-greedy+=-DBUILD=\"\\\"$(BUILD)\\\"\"
-CFLAGS-greedy+=-DVERSION=\"\\\"$(VERSION)\\\"\"
-CFLAGS-greedy+=-DPLATFORM=\"\\\"$(PLATFORM)\\\"\"
-
-EXTRA_CFLAGS+=-Wall -Werror -pipe
-
-BASICS:=$(abspath $(SROOT)/../basics)
-EXTRA_CFLAGS+=-I$(BASICS)/include
-EXTRA_LDFLAGS+=$(BASICS)/src/libb6.a
-
-XMP_LITE:=$(abspath $(SROOT)/../libxmp-lite)
-CFLAGS-greedy+=-I$(XMP_LITE)/include/libxmp-lite
-LDFLAGS-greedy+=$(XMP_LITE)/lib/libxmp-lite.a
-LDFLAGS-greedy+=-lm
-
-ifeq ("$(notdir $(RROOT))","dbg")
-EXTRA_CFLAGS+=-g3 -O0
-else
-EXTRA_CFLAGS+=-g0 -O3 -DNDEBUG
-EXTRA_CFLAGS+=-ffast-math -msse -mfpmath=sse
+ifeq ("$R","dbg")
+cflags+=-g3 -O0
 endif
+ifeq ("$R","opt")
+cflags+=-g0 -O3 -DNDEBUG -ffast-math -msse -mfpmath=sse
+endif
+cflags+=-Wall -Werror -pipe
+ldflags+=-lz
+cppflags+=-I$(CURDIR)
 
 bins+=greedy
 greedy+=greedy.o gl/ sdl/ data/ core/ lib/
@@ -61,4 +49,18 @@ greedy+=greedy.o gl/ sdl/ data/ core/ lib/
 tools+=embed
 embed+=embed.o lib/
 
--include $(SROOT)/$D/Build-$(PLATFORM).mk
+BASICS?=$(abspath $(SROOT)/../basics)
+cppflags+=-I$(BASICS)/include
+ldflags+=$(BASICS)/src/libb6.a
+
+XMP_LITE?=$(abspath $(SROOT)/../libxmp-lite)
+cppflags-greedy+=-I$(XMP_LITE)/include/libxmp-lite
+ldflags-greedy+=$(XMP_LITE)/lib/libxmp-lite.a
+
+cppflags-greedy+=-DBUILD=\"$(BUILD)\"
+cppflags-greedy+=-DVERSION=\"$(VERSION)\"
+cppflags-greedy+=-DPLATFORM=\"$(PLATFORM)\"
+
+ldflags-greedy+=-lm
+
+-include Build-$(PLATFORM).mk

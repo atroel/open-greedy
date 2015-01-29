@@ -17,102 +17,112 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SELF=$(firstword $(MAKEFILE_LIST))
+.PHONY: all clean subdirs
+.NOTPARALLEL: clean
 
 # no default rules
 MAKEFLAGS+=-r
+
 # no default variables
 MAKEFLAGS+=-R
+
+V?=0
+ifeq ($V,0)
+show=echo " $1 $(subst $(RROOT)/,,$2)"
+MAKEFLAGS+=-s
+MAKEFLAGS+=--no-print-directory
+endif
+
+ifeq (,$(SROOT)) # -------------------------------------------------------------
+
+R?=$(CURDIR)
+export RROOT:=$(abspath $R)
+export SROOT:=$(abspath $(CURDIR))
+
+export SELF:=$(SROOT)/$(firstword $(MAKEFILE_LIST))
+
+else # SROOT -------------------------------------------------------------------
 
 ifeq ($(origin SROOT),command line)
 $(error SROOT should not be specified from the command line)
 endif
 
-ifeq ($(SROOT),)
-SROOT=$(abspath $(CURDIR))
-ifeq ($R,)
-RROOT=$(SROOT)/opt
-else
-RROOT=$(abspath $R)
-endif
-export SROOT
-export RROOT
+endif # SROOT ------------------------------------------------------------------
+
+include Build.mk
+
+CC?=gcc
+LD?=ld
+RM?=rm -f
+RMDIR?=rmdir
+MKDIR?=mkdir -p
+
+submake=$(MAKE) -f $(SELF) $1 $2
+
+ifeq (,$T) # -------------------------------------------------------------------
+
+export cppflags:=$(CPPFLAGS)
+export cflags:=$(CFLAGS)
+export ldflags:=$(LDFLAGS)
+
 all:
-	@mkdir -p $(RROOT)/$D && \
-		$(MAKE) -sf $(SROOT)/$(SELF) -C $(RROOT)/$D $@
+	+@$(foreach t,$(tools),\
+		$(call submake,$@,T=$t RROOT=$(abspath $(RROOT)/tools)&&)) true
+	+@$(foreach t,$(bins),$(call submake,$@,T=$t)&&) true
+
 clean:
-	@[ ! -d $(RROOT)/$D ] || \
-		$(MAKE) -sf $(SROOT)/$(SELF) -C $(RROOT)/$D $@
-.NOTPARALLEL: clean
-else
-bins=
-libs=
--include $(SROOT)/$D/Build.mk
-ifeq ($T,)
-CFLAGS:=-I$(SROOT)
-ifneq ("$(EXTRA_CFLAGS)","")
-CFLAGS+=$(EXTRA_CFLAGS)
-endif
-export CFLAGS
-ifneq ("$(EXTRA_LDFLAGS)","")
-LDFLAGS+=$(EXTRA_LDFLAGS)
-endif
-export LDFLAGS
-all clean:
-	@mkdir -p $(RROOT)/build && $(foreach t,$(tools),$(MAKE) -f $(SELF) T=$t -C $(RROOT)/build RROOT=$(RROOT)/build $@;)
-	@$(foreach t,$(libs),$(MAKE) -f $(SELF) T=$t $@;)
-	@$(foreach t,$(bins),$(MAKE) -f $(SELF) T=$t $@;)
-else
-ifneq ("$(MAKECMDGOALS)", "$T")
-ifneq ("$(CFLAGS-$T)","")
-CFLAGS+=$(CFLAGS-$T)
-endif
-ifneq ("$(LDFLAGS-$T)","")
-LDFLAGS+=$(LDFLAGS-$T)
-endif
-endif
-V?=0
-do=@([ "$(V)" -gt 0 ] && echo "$2" || echo " $1"; eval $2)
-nicepath=$(subst $(RROOT)/,,$(abspath $1))
-comp=$(call do,COMP $(call nicepath,$1),gcc -MMD -MT \"$@ $(@:%.o=%.d)\" $(CFLAGS) -o $1 -c $2)
-arch=$(call do,ARCH $(call nicepath,$1),ld -o $1 -r $2)
-link=$(call do,LINK $(call nicepath,$1),gcc -o $1 $2 $(LDFLAGS))
-embed_cmd=+$(call do,DATA $(call nicepath,$1),$(RROOT)/build/embed $(patsubst %.data.o,%,$(notdir $1)) < $2 | gcc $(CFLAGS) -o "$1" -xc -c -)
-sub_clean=+$(foreach t,$1,\
-	  [ ! -d $(RROOT)/$D/$(dir $t) ] || \
-	  $(MAKE) -C $(RROOT)/$(dir $t) -f $(SELF) D=$(dir $t) T=$(notdir $t) clean;)
-VPATH=$(SROOT)/$D
-$T:=$(patsubst %/,%/lib.a,$($T))
-DEPS=$(patsubst %o,%d,$(filter %.o,$($T)))
--include $(DEPS)
-all:
-	$(foreach t,$(filter %.a,$($T)),\
-		mkdir -p $(RROOT)/$(dir $t) && \
-		$(MAKE) -C $(RROOT)/$(dir $t) -f $(SELF) D=$(dir $t) T=$(notdir $t) all &&) \
-	$(MAKE) -f $(SELF) $T
+	+@$(foreach t,$(tools),\
+		$(call submake,$@,T=$t RROOT=$(abspath $(RROOT)/tools);))
+	+@$(foreach t,$(bins),$(call submake,$@,T=$t);)
+
+else # T -----------------------------------------------------------------------
+
+subdir=$(subst $(RROOT),$(SROOT),$1)
+
+DIR:=$(subst $(SROOT),$(RROOT),$(CURDIR))
+OUT:=$(abspath $(addprefix $(DIR)/,$T))
+DEPS:=$(foreach t,$($T),$(addprefix $(DIR)/,$(patsubst %/,%/lib.a, $t)))
+RULES:=$(foreach t,$(filter %.o,$(DEPS)),$(t:.o=.d))
+
+cppflags+=$(cppflags-$T)
+cflags+=$(cflags-$T)
+ldflags+=$(ldflags-$T)
+
+all: subdirs | $(OUT)
+
 clean:
-	$(call sub_clean,$(filter %.a,$($T)))
-	$(call do,CLEAN $(call nicepath,$T),rm -f $T $(filter %.o, $($T)) $(DEPS))
-ifneq ("$(RROOT)", "$(SROOT)")
-	rmdir $(CURDIR) 2> /dev/null || true
+	+$(foreach t,$(filter %.a,$(DEPS)),[ ! -d $(dir $t) ] || \
+		$(call submake,$@,-C $(call subdir,$(dir $t)) T=$(notdir $t));)
+	$(call show,"CLEAN","$(OUT)")
+	$(RM) $(OUT) $(DEPS) $(RULES)
+	$(RMDIR) $(DIR) 2> /dev/null || true
+
+subdirs:
+	+$(MKDIR) $(DIR) $(foreach t,$(filter %.a,$(DEPS)),&&\
+		$(call submake,all,-C $(call subdir,$(dir $t)) T=$(notdir $t)))
+
+$(OUT): $(DEPS)
+ifneq (,$(filter lib%.a,$T))
+	$(call show,"LINK","$@")
+	$(LD) -o $@ -r $^
 endif
-$T: $($T)
-ifneq ($(filter $T,$(tools)),)
-	$(call link,$@,$^)
+ifneq (,$(filter $T,$(tools)))
+	$(call show,"TOOL","$@")
+	$(CC) -o $@ $^ $(ldflags)
 endif
-ifneq ($(filter $T,$(libs)),)
-	$(call arch,$@,$^)
+ifneq (,$(filter $T,$(bins)))
+	$(call show,"EXEC","$@")
+	$(CC) -o $@ $^ $(ldflags)
 endif
-ifneq ($(filter $T,$(bins)),)
-	$(call link,$@,$^)
-endif
-endif # ifeq ($T,)
-%.o: %.c
-	$(call comp,$@,$<)
-%.data.o: % $(SROOT)/lib/embedded.h
-	$(call embed_cmd,$@,$<)
-endif # ifeq ($(SROOT),)
-.PHONY: all clean archive
-archive:
-	tar cfj ../open_greedy-`date -u +%Y%m%d%H%M%S`.tar.bz2 . --exclude-vcs \
-		--exclude-backups --exclude=trash --exclude=opt --exclude=dbg
+
+$(DIR)/%.o: %.c
+	$(call show,"COMP","$@")
+	$(CC) -MMD -MT $@ $(cppflags) $(cflags) -o $@ -c $<
+
+$(DIR)/%.data.o: % $(SROOT)/lib/embedded.h
+	$(call show,"DATA","$@")
+	$(RROOT)/tools/embed $(patsubst %.data.o,%,$(notdir $@)) < $< | $(CC) $(cppflags) $(cflags) -o $@ -xc -c -
+
+-include $(RULES)
+
+endif # T ----------------------------------------------------------------------

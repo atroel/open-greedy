@@ -17,20 +17,38 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-LDFLAGS-embed+=-lz
+ifneq (,$(SDL))
+SDL:=$(abspath $(SDL))
+else
+SDL:=$(abspath $(CURDIR)/../../SDL2-2.0.3)
+ifeq (,$(wildcard $(SDL)))
+$(warning Cannot find SDL2 in $(SDL))
+SDL:=$(abspath $(CURDIR)/../SDL2-2.0.3)
+endif
+endif
+ifeq (,$(wildcard $(SDL)))
+$(error Cannot find SDL2 in $(SDL))
+endif
+cflags-greedy+=-I$(SDL)/include
+ldflags-greedy+=-L$(SDL)/i686-w64-mingw32/lib -lSDL2 -lSDL2main
 
-SDL:=$(abspath $(SROOT)/../SDL2-2.0.3)
-CFLAGS-greedy+=-I$(SDL)/include
-LDFLAGS-greedy+=-L$(SDL)/i686-w64-mingw32/lib -lSDL2 -lSDL2main
+ifneq (,$(SDL_MIXER))
+SDL_MIXER:=$(abspath $(SDL_MIXER))
+else
+SDL_MIXER:=$(abspath $(CURDIR)/../../SDL2_mixer-2.0.0/i686-w64-mingw32)
+ifeq (,$(wildcard $(SDL_MIXER)))
+$(warning Cannot find SDL2 mixer in $(SDL_MIXER))
+SDL_MIXER:=$(abspath $(CURDIR)/../SDL2_mixer-2.0.0/i686-w64-mingw32)
+endif
+endif
+ifeq (,$(wildcard $(SDL_MIXER)))
+$(error Cannot find SDL2 mixer in $(SDL_MIXER))
+endif
+cflags-greedy+=-I$(SDL_MIXER)/include/SDL2
+ldflags-greedy+=-L$(SDL_MIXER)/lib -lSDL2_mixer
 
-SDL_MIXER:=$(abspath $(SROOT)/../SDL2_mixer-2.0.0/i686-w64-mingw32)
-CFLAGS-greedy+=-I$(SDL_MIXER)/include/SDL2
-LDFLAGS-greedy+=-L$(SDL_MIXER)/lib -lSDL2_mixer
+ldflags-greedy+=-lopengl32
 
-LDFLAGS-greedy+=-lopengl32
-
-LDFLAGS-greedy+=$(abspath $(SROOT)/../../lib/libz.a)
-
-EXTRA_CFLAGS+=-I$(SROOT)/win32
+cflags+=-I$(CURDIR)/win32
 
 greedy+=win32/
