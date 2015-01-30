@@ -28,6 +28,7 @@ ldflags-greedy+=-framework CoreServices
 ldflags-greedy+=-Wl,-rpath,@loader_path/../Frameworks
 
 cflags+=-I$(CURDIR)/macos
+cflags+=-DRO_DIR=\"../Resources/data\"
 ldflags+=-rdynamic # for backtrace
 
-greedy+=posix/ macos/
+greedy+=posix/

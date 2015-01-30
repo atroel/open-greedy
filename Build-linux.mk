@@ -27,6 +27,7 @@ ldflags-greedy+=-lSDL2
 ldflags-greedy+=-lSDL2_mixer
 
 cflags+=-I$(CURDIR)/linux
+cflags+=-DRO_DIR=\"/usr/share/games/opengreedy/data,data\"
 ldflags+=-rdynamic # for backtrace
 
 greedy+=linux/ posix/

@@ -37,7 +37,8 @@ const char *get_ro_dir(void)
 {
 	if (!ro_dir)
 		ro_dir = get_platform_ro_dir();
-	b6_check(ro_dir);
+	if (!ro_dir)
+		ro_dir = ".";
 	return ro_dir;
 }
 

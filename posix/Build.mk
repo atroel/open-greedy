@@ -18,4 +18,4 @@
 #
 
 libs+=lib.a
-lib.a:=debug.o
+lib.a:=debug.o env.o
