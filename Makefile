@@ -35,7 +35,7 @@ endif
 
 ifeq (,$(SROOT)) # -------------------------------------------------------------
 
-R?=$(CURDIR)
+R?=opt
 export RROOT:=$(abspath $R)
 export SROOT:=$(abspath $(CURDIR))
 

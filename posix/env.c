@@ -18,13 +18,52 @@
  */
 
 #include <unistd.h>
+#include <sys/types.h>
+#include <dirent.h>
 
 const char *get_platform_user_name(void)
 {
 	return getlogin();
 }
 
+static int probe_ro_dir(const char *ro_dir)
+{
+	DIR *dir = opendir(ro_dir);
+	if (dir)
+		closedir(dir);
+	return !!dir;
+}
+
+#ifndef RO_DIR
+#define RO_DIR ""
+#endif
+
 const char *get_platform_ro_dir(void)
 {
-	return "data";
+	static char chunk[512];
+	static const char *ro_dir = RO_DIR;
+	const char *src = ro_dir;
+	while (*src) {
+		char *dst = chunk;
+		int skip = 0;
+		do {
+			*dst = *src;
+			if (!*dst)
+				break;
+			if (*src++ == ',') {
+				*dst = '\0';
+				break;
+			}
+			dst += 1;
+		} while (!(skip = dst == chunk + sizeof(chunk)));
+		if (skip) {
+			while (*src)
+			       if (*src++ == ',')
+				       break;
+			continue;
+		}
+		if (probe_ro_dir(chunk))
+			return chunk;
+	}
+	return NULL;
 }
