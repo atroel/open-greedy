@@ -150,9 +150,9 @@ void reset_engine(struct engine *self)
 	start_renderer(self->console->default_renderer, 640, 480);
 }
 
-static int init_phase(struct phase *self)
+static int init_phase(struct phase *self, const struct phase *prev)
 {
-	return self->ops->init ? self->ops->init(self) : 0;
+	return self->ops->init ? self->ops->init(self, prev) : 0;
 }
 
 static struct phase *exec_phase(struct phase *self)
@@ -177,7 +177,7 @@ void run_engine(struct engine *self)
 		struct phase *next = self->curr;
 		start_renderer(self->console->default_renderer, 640, 480);
 		self->curr->engine = self;
-		if (init_phase(self->curr)) {
+		if (init_phase(self->curr, prev)) {
 			self->curr = prev;
 			continue;
 		}

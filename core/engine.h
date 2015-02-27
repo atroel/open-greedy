@@ -76,7 +76,7 @@ struct phase {
 };
 
 struct phase_ops {
-	int (*init)(struct phase*);
+	int (*init)(struct phase*, const struct phase*);
 	void (*exit)(struct phase*);
 	struct phase *(*exec)(struct phase*);
 	void (*suspend)(struct phase*);

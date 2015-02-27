@@ -53,7 +53,7 @@ static struct game_phase *to_game_phase(struct phase *up)
 	return b6_cast_of(up, struct game_phase, up);
 }
 
-static int game_phase_init(struct phase *up)
+static int game_phase_init(struct phase *up, const struct phase *prev)
 {
 	struct game_phase *self = to_game_phase(up);
 	const char *skin_id = game_skin ? game_skin : get_skin_id();
