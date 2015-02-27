@@ -155,7 +155,7 @@ static void on_render(struct renderer_observer *observer)
 		hide_renderer_base(self->cursor_base);
 }
 
-static int hall_of_fame_phase_init(struct phase *up)
+static int hall_of_fame_phase_init(struct phase *up, const struct phase *prev)
 {
 	static const struct controller_observer_ops controller_observer_ops = {
 		.on_key_pressed = on_key_pressed,
@@ -185,7 +185,7 @@ static int hall_of_fame_phase_init(struct phase *up)
 				  up->engine->game_config->entry.name);
 	self->entry = NULL;
 	self->quit = 0;
-	if (up->engine->game_result.level) {
+	if (prev == lookup_phase("game")) {
 		self->entry =
 			get_hall_of_fame_entry(self->hall_of_fame,
 					       up->engine->game_result.level,
@@ -196,7 +196,6 @@ static int hall_of_fame_phase_init(struct phase *up)
 			self->size = sizeof(self->entry->name);
 			self->name[self->size] = '\0';
 		}
-		up->engine->game_result.level = 0UL;
 	}
 	root = get_renderer_base(renderer);
 	if (make_font(&self->font, skin_id, HOF_FONT_DATA_ID))

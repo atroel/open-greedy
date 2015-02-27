@@ -132,7 +132,7 @@ static void on_key_pressed(struct controller_observer *observer,
 		self->next = lookup_phase("menu");
 }
 
-static int credits_phase_init(struct phase *up)
+static int credits_phase_init(struct phase *up, const struct phase *prev)
 {
 	static const struct controller_observer_ops controller_observer_ops = {
 		.on_key_pressed = on_key_pressed,

@@ -386,7 +386,7 @@ static void on_select(struct menu_observer *menu_observer)
 	enter_submenu(self, submenu);
 }
 
-static int menu_phase_init(struct phase *up)
+static int menu_phase_init(struct phase *up, const struct phase *prev)
 {
 	static const struct menu_observer_ops menu_observer_ops = {
 		.on_select = on_select,
