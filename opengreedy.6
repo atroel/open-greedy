@@ -1,0 +1,81 @@
+.\" Manpage for opengreedy.
+.\" Contact arnaud.troel@gmail.com to correct errors or typos.
+.TH man 6 "08 February 2015" "0.3" "Games"
+.SH NAME
+opengreedy \- open source version of edromel studio's Greedy XP
+.SH SYNOPSIS
+opengreedy [\fIOPTION\fR]...
+.SH DESCRIPTION
+From the \fImain menu\fR, use the \fBarrow keys\fR to change your selection and
+press \fBReturn\fR to select it. Press \fBEscape\fR to quit the game. Use also
+\fBEscape\fR to return to the main menu from other screens (game, hall of fame,
+credits...).
+
+During the \fIgame\fR, use the \fBarrow keys\fR to control the pacman and eat
+all the pacgums to advance to the next level. The order in which the arrows are
+pressed is recorded so that you can press more than one and better negotiate the
+corners. Each pacgum gives 10 points.
+
+Press \fBP\fR to pause the game.
+
+The number of lives remaining is shown at the bottom right of the top panel. You
+lose one each time a ghost catches up with the pacman. One life is gained every
+30,000 points.
+
+Use \fBShift\fR to temporarily activate your shield and prevent your pacman from
+being eaten by the ghosts. You have to collect shield bonuses before you can
+activate it. The number of shields available is shown left to the number of
+remaining lives.
+
+Use \fBControl\fR to boost your pacman. The amount of available booster is
+displayed as a gauge on the top right corner of the panel. You can reload it by
+collecting related bonuses (single and double hearts). Each time you advance a
+level, you are granted a small amount as well.
+.SH OPTIONS
+.TP
+\fB\-\-fs\fR
+toggle fullscreen (0 or 1)
+.TP
+\fB\-\-fs\fR
+toggle fullscreen (0 or 1)
+.TP
+\fB\-\-vs\fR
+toggle vertical sync (0 or 1)
+.TP
+\fB\-\-ws\fR
+width in pixels
+.TP
+\fB\-\-hs\fR
+height in pixels
+.TP
+\fB\-\-lang\fR
+language ("fr" or "en")
+.TP
+\fB\-\-mode\fR
+game speed ("slow" or "fast")
+.TP
+\fB\-\-console\fR
+video backend ("sdl" or "sdl/gl")
+.TP
+\fB\-\-sdl_sleep\fR
+sleep time in ms after each frame - for sdl or sdl/gl console
+.TP
+\fB\-\-sdl_accel\fR
+toggle hardware acceleration (0 or 1) - only for sdl console
+.TP
+\fB\-\-sdl_scale\fR
+toggle hardware scaling ("nearest", "linear" or "best") - for sdl console only
+.\" .SH SEE ALSO
+.\" .SH BUGS
+.SH AUTHOR
+Written from scratch by Arnaud Troël <arnaud dot troel at gmail dot com>.
+
+Edromel studio's Greedy XP by Marc Radermacher (code), Patrick Lachaux
+(graphics) and Christophe Résigné (music).
+
+.SH COPYRIGHT
+Copyright 2014-2015 Arnaud Troël.
+
+This is Free Software; this software is licensed under the GPL version 2,
+as published by the Free Software Foundation.  There is NO warranty; not
+even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
