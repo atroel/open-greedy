@@ -793,24 +793,16 @@ void finalize_izstream(struct izstream *self)
 	inflateEnd(&self->zstream);
 }
 
-static int do_flush_ozstream(struct ozstream *self, int final)
+static int flush_ozstream(struct ostream *up)
 {
-	int retval = deflate(&self->zstream, final ? Z_FINISH : Z_NO_FLUSH);
-	unsigned long long int size = self->len - self->zstream.avail_out;
-	if (retval == Z_STREAM_ERROR)
-		return -1;
-	if (!size)
-		return 0;
-	if (write_ostream(self->ostream, self->buf, size) != size)
+	struct ozstream *self = b6_cast_of(up, struct ozstream, up);
+	unsigned long long int size;
+	if ((size = self->zstream.next_out - (Bytef*)self->buf) &&
+	    write_ostream(self->ostream, self->buf, size) != size)
 		return -1;
 	self->zstream.next_out = self->buf;
 	self->zstream.avail_out = self->len;
 	return 0;
-}
-
-static int flush_ozstream(struct ostream *up)
-{
-	return do_flush_ozstream(b6_cast_of(up, struct ozstream, up), 1);
 }
 
 static long long int write_ozstream(struct ostream *up, const void *buf,
@@ -819,7 +811,14 @@ static long long int write_ozstream(struct ostream *up, const void *buf,
 	struct ozstream *self = b6_cast_of(up, struct ozstream, up);
 	self->zstream.next_in = (void*)buf;
 	self->zstream.avail_in = len;
-	return do_flush_ozstream(self, 0) ? -1 : len - self->zstream.avail_in;
+	while (self->zstream.avail_in) {
+		int retval;
+		if ((retval = deflate(&self->zstream, Z_NO_FLUSH)) != Z_OK)
+			return -1;
+		if (!self->zstream.avail_out && (retval == flush_ozstream(up)))
+			return retval;
+	}
+	return len;
 }
 
 int initialize_ozstream(struct ozstream *self, struct ostream *ostream,
@@ -832,8 +831,8 @@ int initialize_ozstream(struct ozstream *self, struct ostream *ostream,
 	self->ostream = ostream;
 	self->buf = buf;
 	self->len = len;
-	self->zstream.next_out = buf;
-	self->zstream.avail_out = len;
+	self->zstream.next_out = self->buf;
+	self->zstream.avail_out = self->len;
 	self->zstream.zalloc = Z_NULL;
 	self->zstream.zfree = Z_NULL;
 	self->zstream.opaque = Z_NULL;
@@ -845,7 +844,16 @@ int initialize_ozstream(struct ozstream *self, struct ostream *ostream,
 
 void finalize_ozstream(struct ozstream *self)
 {
+	int retval;
+	self->zstream.next_in = Z_NULL;
+	self->zstream.avail_in = 0;
+	while ((retval = deflate(&self->zstream, Z_FINISH)) != Z_STREAM_END) {
+		if (retval != Z_OK)
+			break; /* FIXME: silent error */
+		flush_ozstream(&self->up);
+	}
 	finalize_ostream(&self->up);
+	flush_ostream(self->ostream);
 	deflateEnd(&self->zstream);
 }
 
