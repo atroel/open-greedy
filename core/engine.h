@@ -32,6 +32,8 @@ struct game_result {
 	unsigned long int score; /* final score in the game */
 };
 
+struct preferences;
+
 struct engine {
 	const struct b6_clock *clock;
 	struct console *console;
@@ -39,11 +41,11 @@ struct engine {
 	const struct game_config *game_config;
 	struct layout_provider *layout_provider;
 	struct layout_shuffler layout_shuffler;
-	short int shuffle;
-	short int quit;
+	int quit;
 	struct phase *curr;
 	struct game_result game_result;
 	struct controller_observer observer;
+	struct preferences *pref;
 	struct b6_json_object *languages;
 	struct b6_json_iterator iter;
 };
@@ -60,14 +62,19 @@ static inline struct renderer *get_engine_renderer(const struct engine *e)
 
 extern struct layout_provider *get_engine_layouts(const struct engine *e);
 
-static inline const struct b6_json_object *get_engine_language(
-	const struct engine *self)
+static inline const struct b6_json_pair *get_engine_language(
+	struct engine *self)
 {
-	const struct b6_json_pair *pair = b6_json_get_iterator(&self->iter);
-	return b6_json_value_as(pair->value, object);
+	return b6_json_get_iterator(&self->iter);
 }
 
-extern const struct b6_json_object *rotate_engine_language(struct engine *self);
+extern void rotate_engine_language(struct engine *self);
+
+extern void set_last_game_result(struct engine *self,
+				 const struct game_result *result);
+
+extern void get_last_game_result(struct engine *self,
+				 struct game_result *result);
 
 struct phase {
 	struct b6_entry entry;
@@ -85,6 +92,7 @@ struct phase_ops {
 
 extern int setup_engine(struct engine *self, const struct b6_clock *clock,
 			struct console *console, struct mixer *mixer,
+			struct preferences *pref,
 			struct b6_json_object *languages);
 
 extern void reset_engine(struct engine *self);

@@ -47,4 +47,10 @@ extern void initialize_json_ostream(struct json_ostream *self,
 
 extern void finalize_json_ostream(struct json_ostream *self);
 
+extern struct b6_json_object *walk_json(struct b6_json_object *self,
+					const void **path_utf8,
+					unsigned int *path_size,
+					unsigned long int npaths,
+					int create);
+
 #endif /* JSON_H */

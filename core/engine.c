@@ -17,29 +17,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "engine.h"
+
+#include <b6/utf8.h>
+
 #include "console.h"
 #include "data.h"
-#include "engine.h"
 #include "game.h"
 #include "json.h"
 #include "level.h"
 #include "mixer.h"
+#include "preferences.h"
 #include "renderer.h"
-
-#include "lib/embedded.h"
-#include <b6/cmdline.h>
-
-static const char *game = "Greedy XP";
-b6_flag(game, string);
-
-static int shuffle = 0;
-b6_flag(shuffle, bool);
-
-static const char *mode = "fast";
-b6_flag(mode, string);
-
-const char *lang = "en";
-b6_flag(lang, string);
 
 B6_REGISTRY_DEFINE(__phase_registry);
 
@@ -64,34 +53,42 @@ static void on_focus_out(struct controller_observer *observer)
 	suspend_mixer(self->mixer);
 }
 
-const struct b6_json_object *rotate_engine_language(struct engine *self)
+void rotate_engine_language(struct engine *self)
 {
 	const struct b6_json_pair *pair;
 	b6_json_advance_iterator(&self->iter);
-	if (!b6_json_get_iterator(&self->iter))
+	if (!(pair = b6_json_get_iterator(&self->iter))) {
 		b6_json_setup_iterator(&self->iter, self->languages);
-	while ((pair = b6_json_get_iterator(&self->iter))) {
+		pair = b6_json_get_iterator(&self->iter);
+	}
+	for (;;) {
+		if (!pair)
+			log_p("no language found.");
 		if (b6_json_value_is_of(pair->value, object))
 			break;
 		b6_json_advance_iterator(&self->iter);
 	}
-	return get_engine_language(self);
 }
 
 static int setup_engine_language(struct engine *self,
 				 struct b6_json_object *languages)
 {
 	const struct b6_json_pair *pair;
+	const void *utf8_data;
+	unsigned int utf8_size;
 	self->languages = languages;
-	b6_json_setup_iterator_at(&self->iter, languages, lang);
-	pair = b6_json_get_iterator(&self->iter);
-	if (pair && b6_json_value_is_of(pair->value, object))
-		return 0;
-	log_w("cannot find \"%s\" language", lang);
+	if ((utf8_data = get_pref_lang(self->pref, &utf8_size))) {
+		b6_json_setup_iterator_at_utf8(&self->iter, languages,
+					       utf8_data, utf8_size);
+		pair = b6_json_get_iterator(&self->iter);
+		if (pair && b6_json_value_is_of(pair->value, object))
+			return 0;
+		log_w("cannot find preferences language");
+	}
 	b6_json_setup_iterator_at(&self->iter, languages, "en");
 	pair = b6_json_get_iterator(&self->iter);
 	if (pair && b6_json_value_is_of(pair->value, object)) {
-		log_i("falling back to \"en\" language", lang);
+		log_i("falling back to \"en\" language");
 		return 0;
 	}
 	log_w("cannot find fallback language");
@@ -104,37 +101,72 @@ static int setup_engine_language(struct engine *self,
 	return -1;
 }
 
+void get_last_game_result(struct engine *self, struct game_result *result)
+{
+	result->level = self->game_result.level;
+	result->score = self->game_result.score;
+}
+
+void set_last_game_result(struct engine *self, const struct game_result *result)
+{
+	const void *game_utf8 = self->layout_provider->entry.name;
+	unsigned int game_size = self->layout_provider->entry.size;
+	const void *mode_utf8 = self->game_config->entry.name;
+	unsigned int mode_size = self->game_config->entry.size;
+	self->game_result.level = result->level;
+	self->game_result.score = result->score;
+	set_pref_level(self->pref, result->level, game_utf8, game_size,
+		       mode_utf8, mode_size);
+}
+
 int setup_engine(struct engine *self, const struct b6_clock *clock,
 		 struct console *console, struct mixer *mixer,
-		 struct b6_json_object *languages)
+		 struct preferences *pref, struct b6_json_object *languages)
 {
 	static const struct controller_observer_ops ops = {
 		.on_quit = on_quit,
 		.on_focus_in = on_focus_in,
 		.on_focus_out = on_focus_out,
 	};
+	const void *utf8;
+	unsigned int size;
 	int retval;
 	setup_controller_observer(&self->observer, &ops);
 	self->clock = clock;
 	self->console = console;
 	self->mixer = mixer;
+	self->pref = pref;
+	set_console_fullscreen(get_pref_fullscreen(self->pref));
+	set_console_vsync(get_pref_vsync(self->pref));
 	if ((retval = setup_engine_language(self, languages)))
 		return retval;
-	if (!(self->layout_provider = lookup_layout_provider(game))) {
+	if (!(utf8 = get_pref_game(self->pref, &size)))
+		utf8 = b6_ascii_to_utf8("Greedy XP", &size);
+	if (!(self->layout_provider = lookup_layout_provider(utf8, size))) {
 		self->layout_provider = get_default_layout_provider();
-		b6_check(self->layout_provider);
-		log_w("Could not find %s level set. Falling back to %s.", game,
-		      self->layout_provider->entry.name);
+		log_w("Falling back to %s.", self->layout_provider->entry.name);
 	}
-	self->shuffle = shuffle;
 	self->quit = 0;
-	if (!(self->game_config = lookup_game_config(mode))) {
-		log_w("unknown mode: %s", mode);
+	self->game_config = NULL;
+	if ((utf8 = get_pref_mode(self->pref, &size))) {
+		self->game_config = lookup_game_config_utf8(utf8, size);
+		if (!self->game_config)
+			log_w("unknown specified game mode");
+	} else
+		log_w("no game mode specified");
+	if (!self->game_config) {
+		log_w("falling back default to game mode");
 		self->game_config = get_default_game_config();
-		log_w("falling back to: %s", self->game_config->entry.name);
 	}
-	self->game_result.score = 0ULL;
-	self->game_result.level = 0ULL;
+	set_pref_mode(self->pref, self->game_config->entry.name,
+		      self->game_config->entry.size);
+	self->game_result.score = 0;
+	self->game_result.level = get_pref_level(
+		self->pref,
+		self->layout_provider->entry.name,
+		self->layout_provider->entry.size,
+		self->game_config->entry.name,
+		self->game_config->entry.size);
 	self->curr = lookup_phase("menu");
 	return 0;
 }
@@ -201,7 +233,7 @@ void run_engine(struct engine *self)
 struct layout_provider *get_engine_layouts(const struct engine *self)
 {
 	struct layout_provider *layout_provider = self->layout_provider;
-	if (self->shuffle) {
+	if (get_pref_shuffle(self->pref)) {
 		struct engine *mutable = (struct engine*)self;
 		reset_layout_shuffler(&mutable->layout_shuffler,
 				      layout_provider);

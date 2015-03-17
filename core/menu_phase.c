@@ -20,33 +20,35 @@
 #include <b6/clock.h>
 #include <b6/cmdline.h>
 #include <b6/json.h>
+#include <b6/utf8.h>
 
 #include "lib/init.h"
 
 #include "console.h"
 #include "controller.h"
+#include "data.h"
 #include "engine.h"
 #include "game.h"
+#include "json.h"
 #include "menu.h"
 #include "menu_controller.h"
 #include "menu_mixer.h"
 #include "menu_renderer.h"
+#include "preferences.h"
 #include "renderer.h"
-#include "data.h"
 
 struct menu_phase;
 
 struct submenu {
 	const struct submenu_ops *ops;
+	struct menu_phase *menu_phase;
+	struct engine *engine;
 };
 
 struct submenu_ops {
-	void (*enter)(struct submenu*, struct menu*,
-		      const struct b6_json_object*);
-	void (*update)(struct submenu*, struct engine*,
-		       const struct b6_json_object*);
-	struct submenu *(*select)(struct submenu*, struct menu_entry*,
-				  struct menu_phase*);
+	void (*enter)(struct submenu*, const struct b6_json_object*);
+	void (*update)(struct submenu*, const struct b6_json_object*);
+	struct submenu *(*select)(struct submenu*, struct menu_entry*);
 	void (*leave)(struct submenu*);
 };
 
@@ -58,6 +60,15 @@ struct main_menu {
 	struct menu_entry credits;
 	struct menu_entry quit;
 };
+
+static int setup_submenu(struct submenu *self, const struct submenu_ops *ops,
+			 struct menu_phase *menu_phase, struct engine *engine)
+{
+	self->ops = ops;
+	self->menu_phase = menu_phase;
+	self->engine = engine;
+	return 0;
+}
 
 struct options_menu {
 	struct submenu up;
@@ -98,7 +109,7 @@ struct menu_phase {
 	struct options_menu options_menu;
 	struct game_options_menu game_options_menu;
 	struct video_options_menu video_options_menu;
-	const struct b6_json_object *lang;
+	struct b6_json_object *lang;
 	struct submenu *submenu;
 	struct phase *next;
 };
@@ -111,16 +122,31 @@ static struct menu_phase *to_menu_phase(struct phase *up)
 	return b6_cast_of(up, struct menu_phase, up);
 }
 
-static void enter_main(struct submenu *up, struct menu *menu,
-		       const struct b6_json_object *lang)
+static void enter_main(struct submenu *up, const struct b6_json_object *lang)
 {
 	struct main_menu *self = b6_cast_of(up, struct main_menu, up);
-	add_menu_entry(menu, &self->play);
-	add_menu_entry(menu, &self->options);
-	add_menu_entry(menu, &self->hof);
-	add_menu_entry(menu, &self->credits);
-	add_menu_entry(menu, &self->quit);
-	set_quit_entry(menu, &self->quit);
+	add_menu_entry(&up->menu_phase->menu, &self->play);
+	add_menu_entry(&up->menu_phase->menu, &self->options);
+	add_menu_entry(&up->menu_phase->menu, &self->hof);
+	add_menu_entry(&up->menu_phase->menu, &self->credits);
+	add_menu_entry(&up->menu_phase->menu, &self->quit);
+	set_quit_entry(&up->menu_phase->menu, &self->quit);
+}
+
+static void setup_menu_entry_utf8(struct menu_entry *entry,
+				  const struct b6_json_object *lang,
+				  const void *utf8, unsigned int size)
+{
+	const struct b6_json_string *text =
+		b6_json_get_object_utf8_as(lang, utf8, size, string);
+	if (!text) {
+		log_w("could not find menu text entry");
+		entry->utf8_data = utf8;
+		entry->utf8_size = size;
+	} else {
+		entry->utf8_data = b6_json_string_utf8(text);
+		entry->utf8_size = b6_json_string_size(text);
+	}
 }
 
 static void setup_menu_entry(struct menu_entry *entry,
@@ -131,18 +157,14 @@ static void setup_menu_entry(struct menu_entry *entry,
 		b6_json_get_object_as(lang, key, string);
 	if (!text) {
 		log_w("could not find menu text entry \"%s\"", key);
-		entry->utf8_data = key;
-		entry->utf8_size = 0;
-		while (*key++)
-			entry->utf8_size += 1;
+		entry->utf8_data = b6_ascii_to_utf8(key, &entry->utf8_size);
 	} else {
 		entry->utf8_data = b6_json_string_utf8(text);
 		entry->utf8_size = b6_json_string_size(text);
 	}
 }
 
-static void update_main(struct submenu *up, struct engine *engine,
-			const struct b6_json_object *lang)
+static void update_main(struct submenu *up, const struct b6_json_object *lang)
 {
 	struct main_menu *self = b6_cast_of(up, struct main_menu, up);
 	setup_menu_entry(&self->play, lang, "play");
@@ -152,12 +174,12 @@ static void update_main(struct submenu *up, struct engine *engine,
 	setup_menu_entry(&self->quit, lang, "quit");
 }
 
-static struct submenu *select_main(struct submenu *up, struct menu_entry *entry,
-				   struct menu_phase *phase)
+static struct submenu *select_main(struct submenu *up, struct menu_entry *entry)
 {
 	struct main_menu *self = b6_cast_of(up, struct main_menu, up);
+	struct menu_phase *phase = up->menu_phase;
 	if (entry == &self->options)
-		return &phase->options_menu.up;
+		return &up->menu_phase->options_menu.up;
 	else if (entry == &self->play)
 		phase->next = lookup_phase("game");
 	else if (entry == &self->quit)
@@ -169,18 +191,18 @@ static struct submenu *select_main(struct submenu *up, struct menu_entry *entry,
 	return up;
 }
 
-static void enter_options(struct submenu *up, struct menu *menu,
-			  const struct b6_json_object *lang)
+static void enter_options(struct submenu *up, const struct b6_json_object *lang)
 {
 	struct options_menu *self = b6_cast_of(up, struct options_menu, up);
-	add_menu_entry(menu, &self->game_options);
-	add_menu_entry(menu, &self->video_options);
-	add_menu_entry(menu, &self->lang);
-	add_menu_entry(menu, &self->back);
-	set_quit_entry(menu, &self->back);
+	struct menu_phase *phase = up->menu_phase;
+	add_menu_entry(&phase->menu, &self->game_options);
+	add_menu_entry(&phase->menu, &self->video_options);
+	add_menu_entry(&phase->menu, &self->lang);
+	add_menu_entry(&phase->menu, &self->back);
+	set_quit_entry(&phase->menu, &self->back);
 }
 
-static void update_options(struct submenu *up, struct engine *engine,
+static void update_options(struct submenu *up,
 			   const struct b6_json_object *lang)
 {
 	struct options_menu *self = b6_cast_of(up, struct options_menu, up);
@@ -191,10 +213,10 @@ static void update_options(struct submenu *up, struct engine *engine,
 }
 
 static struct submenu *select_options(struct submenu *up,
-				      struct menu_entry *entry,
-				      struct menu_phase *phase)
+				      struct menu_entry *entry)
 {
 	struct options_menu *self = b6_cast_of(up, struct options_menu, up);
+	struct menu_phase *phase = up->menu_phase;
 	if (entry == &self->game_options)
 		return &phase->game_options_menu.up;
 	if (entry == &self->video_options)
@@ -202,36 +224,44 @@ static struct submenu *select_options(struct submenu *up,
 	if (entry == &self->back)
 		return &phase->main_menu.up;
 	if (entry == &self->lang) do {
-		const struct b6_json_object *lang =
-			rotate_engine_language(phase->up.engine);
+		const struct b6_json_pair *pair;
+		struct b6_json_object *lang;
+		rotate_engine_language(phase->up.engine);
+		pair = get_engine_language(phase->up.engine);
+		set_pref_lang(up->engine->pref, b6_json_string_utf8(pair->key),
+			      b6_json_string_size(pair->key));
+		lang = b6_json_value_as(get_engine_language(up->engine)->value,
+					object);
 		phase->lang = b6_json_get_object_as(lang, "menu", object);
 	} while (!phase->lang);
 	return up;
 }
 
-static void enter_game_options(struct submenu *up, struct menu *menu,
+static void enter_game_options(struct submenu *up,
 			       const struct b6_json_object *lang)
 {
 	struct game_options_menu *self =
 		b6_cast_of(up, struct game_options_menu, up);
-	add_menu_entry(menu, &self->game);
-	add_menu_entry(menu, &self->shuffle);
-	add_menu_entry(menu, &self->mode);
-	add_menu_entry(menu, &self->back);
-	set_quit_entry(menu, &self->back);
+	struct menu_phase *phase = up->menu_phase;
+	add_menu_entry(&phase->menu, &self->game);
+	add_menu_entry(&phase->menu, &self->shuffle);
+	add_menu_entry(&phase->menu, &self->mode);
+	add_menu_entry(&phase->menu, &self->back);
+	set_quit_entry(&phase->menu, &self->back);
 	self->game_label = NULL;
 }
 
-#include <string.h>  /* FIXME */
-
-static void update_game_options(struct submenu *up, struct engine *engine,
+static void update_game_options(struct submenu *up,
 				const struct b6_json_object *lang)
 {
-	static const struct game_config *slow = NULL;
-	static const struct game_config *fast = NULL;
 	struct game_options_menu *self =
 		b6_cast_of(up, struct game_options_menu, up);
 	struct b6_json_string *text;
+	const void *utf8_data;
+	unsigned int utf8_size;
+	utf8_data = b6_ascii_to_utf8(up->engine->layout_provider->entry.name,
+				     &utf8_size);
+	set_pref_game(up->engine->pref, utf8_data, utf8_size);
 	if (self->game_label)
 		b6_json_unref_value(&self->game_label->up);
 	self->game_label = b6_json_new_string(lang->json, NULL);
@@ -241,45 +271,40 @@ static void update_game_options(struct submenu *up, struct engine *engine,
 						    b6_json_string_utf8(text),
 						    b6_json_string_size(text));
 	}
-	self->game_label->impl->ops->append(self->game_label->impl,
-					    self->game_label->json->impl,
-					    engine->layout_provider->entry.name,
-					    strlen(engine->layout_provider->entry.name));
+	self->game_label->impl->ops->append(
+		self->game_label->impl, self->game_label->json->impl,
+		utf8_data, utf8_size);
 	self->game.utf8_data = b6_json_string_utf8(self->game_label);
 	self->game.utf8_size = b6_json_string_size(self->game_label);
-	if (!slow)
-		slow = lookup_game_config("slow");
-	if (!fast)
-		fast = lookup_game_config("fast");
-	if (engine->game_config == slow)
-		setup_menu_entry(&self->mode, lang, "mode_slow");
-	else if (engine->game_config == fast)
-		setup_menu_entry(&self->mode, lang, "mode_fast");
-	else {
-		log_e("unknown mode");
-		setup_menu_entry(&self->mode, lang, "mode_fast");
-	}
+	setup_menu_entry_utf8(&self->mode, lang,
+			      up->engine->game_config->entry.name,
+			      up->engine->game_config->entry.size);
 	setup_menu_entry(&self->shuffle, lang,
-			 engine->shuffle ? "shuffle_on" : "shuffle_off");
+			 get_pref_shuffle(up->engine->pref) ?
+			 "shuffle_on" : "shuffle_off");
 	setup_menu_entry(&self->back, lang, "back");
 }
 
 static struct submenu *select_game_options(struct submenu *up,
-					   struct menu_entry *entry,
-					   struct menu_phase *phase)
+					   struct menu_entry *entry)
 {
 	struct game_options_menu *self =
 		b6_cast_of(up, struct game_options_menu, up);
-	struct engine *engine = phase->up.engine;
+	struct menu_phase *phase = up->menu_phase;
 	if (entry == &self->back)
 		return &phase->options_menu.up;
 	if (entry == &self->game)
-		engine->layout_provider =
-			get_next_layout_provider(engine->layout_provider);
-	else if (entry == &self->mode)
-		engine->game_config = get_next_game_config(engine->game_config);
-	else if (entry == &self->shuffle)
-		engine->shuffle = !engine->shuffle;
+		up->engine->layout_provider =
+			get_next_layout_provider(up->engine->layout_provider);
+	else if (entry == &self->mode) {
+		up->engine->game_config =
+			get_next_game_config(up->engine->game_config);
+		set_pref_mode(up->engine->pref,
+			      up->engine->game_config->entry.name,
+			      up->engine->game_config->entry.size);
+	} else if (entry == &self->shuffle)
+		set_pref_shuffle(up->engine->pref,
+				 !get_pref_shuffle(up->engine->pref));
 	return up;
 }
 
@@ -291,63 +316,70 @@ static void leave_game_options(struct submenu *up)
 		b6_json_unref_value(&self->game_label->up);
 }
 
-static void enter_video_options(struct submenu *up, struct menu *menu,
+static void enter_video_options(struct submenu *up,
 				const struct b6_json_object *lang)
 {
 	struct video_options_menu *self =
 		b6_cast_of(up, struct video_options_menu, up);
+	struct menu_phase *phase = up->menu_phase;
 	self->vs = get_console_vsync();
 	self->fs = get_console_fullscreen();
-	add_menu_entry(menu, &self->fullscreen);
-	add_menu_entry(menu, &self->vsync);
-	add_menu_entry(menu, &self->apply);
-	add_menu_entry(menu, &self->back);
-	set_quit_entry(menu, &self->back);
+	add_menu_entry(&phase->menu, &self->fullscreen);
+	add_menu_entry(&phase->menu, &self->vsync);
+	add_menu_entry(&phase->menu, &self->apply);
+	add_menu_entry(&phase->menu, &self->back);
+	set_quit_entry(&phase->menu, &self->back);
 }
 
-static void update_video_options(struct submenu *up, struct engine *engine,
+static void update_video_options(struct submenu *up,
 				 const struct b6_json_object *lang)
 {
 	struct video_options_menu *self =
 		b6_cast_of(up, struct video_options_menu, up);
 	setup_menu_entry(&self->fullscreen, lang,
-			 self->fs ? "fullscreen_on" : "fullscreen_off");
+			 self->fs ?  "fullscreen_on" : "fullscreen_off");
 	setup_menu_entry(&self->vsync, lang,
-			 self->vs ? "vsync_on" : "vsync_off");
+			 self->vs ?  "vsync_on" : "vsync_off");
 	setup_menu_entry(&self->apply, lang, "apply");
 	setup_menu_entry(&self->back, lang, "back");
 }
 
 static struct submenu *select_video_options(struct submenu *up,
-					    struct menu_entry *entry,
-					    struct menu_phase *phase)
+					    struct menu_entry *entry)
 {
 	struct video_options_menu *self =
 		b6_cast_of(up, struct video_options_menu, up);
+	struct menu_phase *phase = up->menu_phase;
 	if (entry == &self->back)
 		return &phase->options_menu.up;
-	if (entry == &self->fullscreen)
+	if (entry == &self->fullscreen) {
 		self->fs = !self->fs;
-	else if (entry == &self->vsync)
+		return up;
+	}
+	if (entry == &self->vsync) {
 		self->vs = !self->vs;
-	else if (entry == &self->apply &&
-		 (self->vs != get_console_vsync() ||
-		  self->fs != get_console_fullscreen())) {
-		struct engine *engine = phase->up.engine;
+		return up;
+	}
+	if (entry == &self->apply) {
+		set_pref_vsync(up->engine->pref, self->vs);
+		set_pref_fullscreen(up->engine->pref, self->fs);
+		if (self->vs == get_console_vsync() &&
+		    self->fs == get_console_fullscreen())
+			return up;
 		set_console_vsync(self->vs);
 		set_console_fullscreen(self->fs);
 		finalize_menu_controller(&phase->controller);
 		del_menu_observer(&phase->menu_observer);
 		close_menu_renderer(&phase->renderer);
 		finalize_menu_renderer(&phase->renderer);
-		reset_engine(engine);
+		reset_engine(up->engine);
 		initialize_menu_renderer(&phase->renderer,
-					 get_engine_renderer(engine),
-					 engine->clock, get_skin_id());
+					 get_engine_renderer(up->engine),
+					 up->engine->clock, get_skin_id());
 		open_menu_renderer(&phase->renderer, &phase->menu);
 		add_menu_observer(&phase->menu, &phase->menu_observer);
 		initialize_menu_controller(&phase->controller, &phase->menu,
-					   get_engine_controller(engine));
+					   get_engine_controller(up->engine));
 	}
 	return up;
 }
@@ -365,8 +397,8 @@ static void enter_submenu(struct menu_phase *self, struct submenu *submenu)
 {
 	initialize_menu(&self->menu);
 	self->submenu = submenu;
-	self->submenu->ops->enter(self->submenu, &self->menu, self->lang);
-	self->submenu->ops->update(self->submenu, self->up.engine, self->lang);
+	self->submenu->ops->enter(self->submenu, self->lang);
+	self->submenu->ops->update(self->submenu, self->lang);
 	open_menu_renderer(&self->renderer, &self->menu);
 	add_menu_observer(&self->menu, &self->menu_observer);
 }
@@ -376,9 +408,9 @@ static void on_select(struct menu_observer *menu_observer)
 	struct menu_phase *self =
 		b6_cast_of(menu_observer, struct menu_phase, menu_observer);
 	struct menu_entry *entry = get_current_menu_entry(&self->menu);
-	struct submenu *submenu = self->submenu->ops->select(self->submenu,
-							     entry, self);
-	self->submenu->ops->update(self->submenu, self->up.engine, self->lang);
+	struct submenu *submenu =
+		self->submenu->ops->select(self->submenu, entry);
+	self->submenu->ops->update(self->submenu, self->lang);
 	update_menu_renderer(&self->renderer);
 	if (submenu == self->submenu)
 		return;
@@ -415,16 +447,19 @@ static int menu_phase_init(struct phase *up, const struct phase *prev)
 	struct menu_phase *self = to_menu_phase(up);
 	const char *skin_id = menu_skin ? menu_skin : get_skin_id();
 	int retval;
-	const struct b6_json_object *lang = get_engine_language(up->engine);
+	struct b6_json_object *lang;
+	lang = b6_json_value_as(get_engine_language(up->engine)->value, object);
 	if (!(self->lang = b6_json_get_object_as(lang, "menu", object))) {
 		log_e("cannot find menu json object");
 		return -1;
 	}
 	self->next = up;
-	self->main_menu.up.ops = &main_ops;
-	self->options_menu.up.ops = &options_ops;
-	self->game_options_menu.up.ops = &game_options_ops;
-	self->video_options_menu.up.ops = &video_options_ops;
+	setup_submenu(&self->main_menu.up, &main_ops, self, up->engine);
+	setup_submenu(&self->options_menu.up, &options_ops, self, up->engine);
+	setup_submenu(&self->game_options_menu.up, &game_options_ops, self,
+		      up->engine);
+	setup_submenu(&self->video_options_menu.up, &video_options_ops, self,
+		      up->engine);
 	retval = initialize_menu_renderer(&self->renderer,
 					  get_engine_renderer(up->engine),
 					  up->engine->clock, skin_id);

@@ -66,8 +66,8 @@ static int game_phase_init(struct phase *up, const struct phase *prev)
 		log_e("cannot initialize game (%d)", retval);
 		goto fail_game;
 	}
-	if (!(lang = b6_json_get_object_as(get_engine_language(up->engine),
-					   "game", object))) {
+	lang = b6_json_value_as(get_engine_language(up->engine)->value, object);
+	if (!(lang = b6_json_get_object_as(lang, "game", object))) {
 		log_e("cannot find game text");
 		goto fail_renderer;
 	}
@@ -94,6 +94,10 @@ fail_game:
 static void game_phase_exit(struct phase *up)
 {
 	struct game_phase *self = to_game_phase(up);
+	struct game_result game_result;
+	game_result.score = self->game.pacman.score;
+	game_result.level = self->game.n - 1;
+	set_last_game_result(up->engine, &game_result);
 	finalize_game_mixer(&self->mixer);
 	finalize_game_renderer(&self->renderer);
 	finalize_game_controller(&self->controller);
@@ -109,11 +113,8 @@ static struct phase *game_phase_exec(struct phase *up)
 {
 	struct game_phase *self = to_game_phase(up);
 	b6_sync_cached_clock(&self->clock);
-	if (!play_game(&self->game)) {
-		up->engine->game_result.score = self->game.pacman.score;
-		up->engine->game_result.level = self->game.n;
+	if (!play_game(&self->game))
 		return lookup_phase("hall_of_fame");
-	}
 	update_game(&self->game);
 	return up;
 }

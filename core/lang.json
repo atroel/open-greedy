@@ -18,8 +18,8 @@
 			"game" : "Levels: ",
 			"shuffle_on" : "Order: random",
 			"shuffle_off" : "Order: normal",
-			"mode_slow" : "Speed: slow",
-			"mode_fast" : "Speed: fast"
+			"slow" : "Speed: slow",
+			"fast" : "Speed: fast"
 		},
 		"game" : {
 			"get_ready"      : "GET READY!",
@@ -96,8 +96,8 @@
 			"game" : "Niveaux: ",
 			"shuffle_on" : "Ordre: hasard",
 			"shuffle_off" : "Ordre: normal",
-			"mode_slow" : "Vitesse: lente ",
-			"mode_fast" : "Vitesse: rapide"
+			"slow" : "Vitesse: lente ",
+			"fast" : "Vitesse: rapide"
 		},
 		"game" : {
 			"get_ready"      : "PRET?",

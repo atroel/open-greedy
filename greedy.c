@@ -22,11 +22,14 @@
 #include <b6/clock.h>
 #include <b6/cmdline.h>
 #include <b6/json.h>
+#include <b6/utf8.h>
+
 #include "core/console.h"
 #include "core/mixer.h"
 #include "core/engine.h"
 #include "core/json.h"
 #include "core/game.h"
+#include "core/preferences.h"
 #include "core/renderer.h"
 #include "lib/embedded.h"
 #include "lib/init.h"
@@ -43,6 +46,24 @@ b6_flag_named(console_name, string, "console");
 
 static const char *log_flag = NULL;
 b6_flag_named(log_flag, string, "log");
+
+static int fs = -1;
+b6_flag(fs, bool);
+
+static int vs = -1;
+b6_flag(vs, bool);
+
+static int shuffle = -1;
+b6_flag(shuffle, bool);
+
+static const char *game = NULL;
+b6_flag(game, string);
+
+static const char *mode = NULL;
+b6_flag(mode, string);
+
+const char *lang = NULL;
+b6_flag(lang, string);
 
 /* ascii to lev */
 static int a2l(struct b6_cmd *b6_cmd, int argc, char *argv[])
@@ -159,7 +180,8 @@ static int greedy(struct b6_clock *clock)
 	struct console *console = NULL;
 	struct mixer *mixer = NULL;
 	struct b6_json *json = NULL;
-	struct b6_json_object *lang = NULL;
+	struct b6_json_object *languages = NULL;
+	struct preferences preferences;
 	struct engine engine;
 	puts("Open Greedy - Copyright (C) 2014-2015 Arnaud TROEL");
 	puts("This program comes with ABSOLUTELY NO WARRANTY.");
@@ -177,16 +199,43 @@ static int greedy(struct b6_clock *clock)
 		goto bail_out;
 	if (!(json = get_json()))
 		goto bail_out;
-	if (!(lang = get_embedded_lang(json)))
+	if (!(languages = get_embedded_lang(json)))
 		goto bail_out;
 	reset_random_number_generator(b6_get_clock_time(clock));
-	if (!setup_engine(&engine, clock, console, mixer, lang)) {
+	if (initialize_pref(&preferences, json, "prefs.json.z"))
+		goto bail_out;
+	load_pref(&preferences);
+	if (vs >= 0)
+		set_pref_vsync(&preferences, vs);
+	if (fs >= 0)
+		set_pref_fullscreen(&preferences, fs);
+	if (shuffle >= 0)
+		set_pref_shuffle(&preferences, shuffle);
+	if (mode && lookup_game_config(mode)) {
+		unsigned int utf8_size;
+		const void *utf8_data = b6_ascii_to_utf8(mode, &utf8_size);
+		set_pref_mode(&preferences, utf8_data, utf8_size);
+	}
+	if (game) {
+		unsigned int utf8_size;
+		const void *utf8_data = b6_ascii_to_utf8(game, &utf8_size);
+		set_pref_game(&preferences, utf8_data, utf8_size);
+	}
+	if (lang) {
+		unsigned int utf8_size;
+		const void *utf8_data = b6_ascii_to_utf8(lang, &utf8_size);
+		set_pref_lang(&preferences, utf8_data, utf8_size);
+	}
+	if (!setup_engine(&engine, clock, console, mixer, &preferences,
+			  languages)) {
 		run_engine(&engine);
 		retval = EXIT_SUCCESS;
 	}
+	save_pref(&preferences);
+	finalize_pref(&preferences);
 bail_out:
-	if (lang)
-		b6_json_unref_value(&lang->up);
+	if (languages)
+		b6_json_unref_value(&languages->up);
 	if (json)
 		put_json(json);
 	if (mixer)
