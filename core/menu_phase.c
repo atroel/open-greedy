@@ -55,6 +55,7 @@ struct submenu_ops {
 struct main_menu {
 	struct submenu up;
 	struct menu_entry play;
+	struct menu_entry resume;
 	struct menu_entry options;
 	struct menu_entry hof;
 	struct menu_entry credits;
@@ -125,6 +126,10 @@ static struct menu_phase *to_menu_phase(struct phase *up)
 static void enter_main(struct submenu *up, const struct b6_json_object *lang)
 {
 	struct main_menu *self = b6_cast_of(up, struct main_menu, up);
+	struct game_result game_result;
+	get_last_game_result(up->engine, &game_result);
+	if (game_result.level)
+		add_menu_entry(&up->menu_phase->menu, &self->resume);
 	add_menu_entry(&up->menu_phase->menu, &self->play);
 	add_menu_entry(&up->menu_phase->menu, &self->options);
 	add_menu_entry(&up->menu_phase->menu, &self->hof);
@@ -167,6 +172,7 @@ static void setup_menu_entry(struct menu_entry *entry,
 static void update_main(struct submenu *up, const struct b6_json_object *lang)
 {
 	struct main_menu *self = b6_cast_of(up, struct main_menu, up);
+	setup_menu_entry(&self->resume, lang, "resume");
 	setup_menu_entry(&self->play, lang, "play");
 	setup_menu_entry(&self->options, lang, "options");
 	setup_menu_entry(&self->hof, lang, "hof");
@@ -180,9 +186,13 @@ static struct submenu *select_main(struct submenu *up, struct menu_entry *entry)
 	struct menu_phase *phase = up->menu_phase;
 	if (entry == &self->options)
 		return &up->menu_phase->options_menu.up;
-	else if (entry == &self->play)
+	else if (entry == &self->resume)
 		phase->next = lookup_phase("game");
-	else if (entry == &self->quit)
+	else if (entry == &self->play) {
+		struct game_result game_result = { .score = 0, .level = 0, };
+		set_last_game_result(up->engine, &game_result);
+		phase->next = lookup_phase("game");
+	} else if (entry == &self->quit)
 		phase->next = NULL;
 	else if (entry == &self->hof)
 		phase->next = lookup_phase("hall_of_fame");
