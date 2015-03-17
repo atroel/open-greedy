@@ -42,9 +42,6 @@ struct game_phase {
 	struct game_controller controller;
 };
 
-static unsigned int level = 0;
-b6_flag(level, uint);
-
 static const char *game_skin = NULL;
 b6_flag(game_skin, string);
 
@@ -59,10 +56,13 @@ static int game_phase_init(struct phase *up, const struct phase *prev)
 	const char *skin_id = game_skin ? game_skin : get_skin_id();
 	struct b6_json_object *lang;
 	int retval;
+	struct game_result game_result;
 	b6_setup_cached_clock(&self->clock, up->engine->clock);
+	get_last_game_result(up->engine, &game_result);
 	if ((retval = initialize_game(&self->game, &self->clock.up,
 				      up->engine->game_config,
-				      get_engine_layouts(up->engine), level))) {
+				      get_engine_layouts(up->engine),
+				      game_result.level))) {
 		log_e("cannot initialize game (%d)", retval);
 		goto fail_game;
 	}

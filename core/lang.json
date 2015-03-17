@@ -1,7 +1,8 @@
 {
 	"en" : {
 		"menu" : {
-			"play" : "Play",
+			"play" : "New Game",
+			"resume" : "Continue",
 			"options" : "Options",
 			"hof" : "Hiscores",
 			"credits" : "Credits",
@@ -79,7 +80,8 @@
 	},
 	"fr" : {
 		"menu" : {
-			"play" : "Jouer",
+			"play" : "Nouvelle partie",
+			"resume" : "Continuer",
 			"options" : "Options",
 			"hof" : "Meilleurs scores",
 			"credits" : "Credits",
