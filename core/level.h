@@ -86,13 +86,13 @@ static inline void unregister_layout_provider(struct layout_provider *self)
 	b6_unregister(&__layout_provider_registry, &self->entry);
 }
 
-static inline struct layout_provider *lookup_layout_provider(const char *name)
+static inline struct layout_provider *lookup_layout_provider(const void *utf8,
+							     unsigned int size)
 {
-	struct b6_entry *entry = b6_lookup_registry(&__layout_provider_registry,
-						    name);
-	if (!entry)
-		return NULL;
-	return b6_cast_of(entry, struct layout_provider, entry);
+	struct b6_entry *e =
+		b6_lookup_registry_utf8(&__layout_provider_registry,
+					utf8, size);
+	return e ? b6_cast_of(e, struct layout_provider, entry) : NULL;
 }
 
 static inline struct layout_provider *get_next_layout_provider(

@@ -140,6 +140,7 @@ static int credits_phase_init(struct phase *up, const struct phase *prev)
 	struct credits_phase *self = b6_cast_of(up, struct credits_phase, up);
 	struct renderer *renderer = get_engine_renderer(up->engine);
 	struct renderer_base *root = get_renderer_base(renderer);
+	const struct b6_json_object *lang;
 	const struct b6_json_array *array;
 	struct data_entry *data;
 	struct istream *istream;
@@ -150,8 +151,8 @@ static int credits_phase_init(struct phase *up, const struct phase *prev)
 		return -1;
 	font_w = get_fixed_font_width(&self->font);
 	font_h = get_fixed_font_height(&self->font);
-	if (!(array = b6_json_get_object_as(get_engine_language(up->engine),
-					    "credits", array))) {
+	lang = b6_json_value_as(get_engine_language(up->engine)->value, object);
+	if (!(array = b6_json_get_object_as(lang, "credits", array))) {
 		log_e("cannot find credits text");
 		finalize_fixed_font(&self->font);
 		return -1;

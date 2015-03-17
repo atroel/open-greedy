@@ -97,9 +97,15 @@ static inline const struct game_config *get_default_game_config(void)
 static inline const struct game_config *lookup_game_config(const char *name)
 {
 	struct b6_entry *e = b6_lookup_registry(&__game_config_registry, name);
-	if (!e)
-		return NULL;
-	return b6_cast_of(e, struct game_config, entry);
+	return e ? b6_cast_of(e, struct game_config, entry) : NULL;
+}
+
+static inline const struct game_config *lookup_game_config_utf8(
+	const void *utf8, unsigned int size)
+{
+	struct b6_entry *e = b6_lookup_registry_utf8(&__game_config_registry,
+						     utf8, size);
+	return e ? b6_cast_of(e, struct game_config, entry) : NULL;
 }
 
 static inline const struct game_config *get_next_game_config(

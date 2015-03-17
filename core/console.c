@@ -28,10 +28,7 @@ static unsigned short int hs = 0;
 b6_flag(hs, ushort);
 
 static int fs = 0;
-b6_flag(fs, bool);
-
 static int vs = 1;
-b6_flag(vs, bool);
 
 B6_REGISTRY_DEFINE(__console_registry);
 

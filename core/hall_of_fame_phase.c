@@ -186,10 +186,11 @@ static int hall_of_fame_phase_init(struct phase *up, const struct phase *prev)
 	self->entry = NULL;
 	self->quit = 0;
 	if (prev == lookup_phase("game")) {
-		self->entry =
-			get_hall_of_fame_entry(self->hall_of_fame,
-					       up->engine->game_result.level,
-					       up->engine->game_result.score);
+		struct game_result game_result;
+		get_last_game_result(up->engine, &game_result);
+		self->entry = get_hall_of_fame_entry(self->hall_of_fame,
+						     game_result.level + 1,
+						     game_result.score);
 		if (!self->entry)
 			self->quit = 1;
 		if (self->size > sizeof(self->entry->name)) {
@@ -291,7 +292,6 @@ static void hall_of_fame_phase_exit(struct phase *up)
 		save_hall_of_fame(self->hall_of_fame);
 		self->entry = NULL;
 	}
-	up->engine->game_result.score = 0ULL;
 	if (self->music) {
 		stop_music(up->engine->mixer);
 		unload_music(up->engine->mixer);
