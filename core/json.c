@@ -93,13 +93,12 @@ void finalize_json_ostream(struct json_ostream *self)
 }
 
 struct b6_json_object *walk_json(struct b6_json_object *self,
-				 const void **path_utf8,
-				 unsigned int *path_size,
-				 unsigned long int npaths, int create)
+				 const struct b6_utf8 *paths,
+				 unsigned long int npaths,
+				 int create)
 {
-	for (; npaths--; path_utf8 += 1, path_size += 1) {
-		struct b6_json_value *value;
-		value = b6_json_get_object_utf8(self, *path_utf8, *path_size);
+	for (; npaths--; paths += 1) {
+		struct b6_json_value *value = b6_json_get_object(self, paths);
 		if (!value) {
 			struct b6_json_object *object;
 			enum b6_json_error error;
@@ -108,9 +107,7 @@ struct b6_json_object *walk_json(struct b6_json_object *self,
 			if (!(object = b6_json_new_object(self->json)))
 				return NULL;
 			value = &object->up;
-			if ((error = b6_json_set_object_utf8(self, *path_utf8,
-							     *path_size,
-							     value))) {
+			if ((error = b6_json_set_object(self, paths, value))) {
 				b6_json_unref_value(value);
 				return NULL;
 			}

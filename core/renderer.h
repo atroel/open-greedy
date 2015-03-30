@@ -400,9 +400,10 @@ static inline void del_renderer_observer(struct renderer_observer *o)
 
 extern struct b6_registry __base_registry;
 
-static inline int register_renderer(struct renderer *self, const char *name)
+static inline int register_renderer(struct renderer *self,
+				    const struct b6_utf8 *id)
 {
-	return b6_register(&__base_registry, &self->entry, name);
+	return b6_register(&__base_registry, &self->entry, id);
 }
 
 static inline void unregister_renderer(struct renderer *self)
@@ -410,9 +411,9 @@ static inline void unregister_renderer(struct renderer *self)
 	b6_unregister(&__base_registry, &self->entry);
 }
 
-static inline struct renderer *lookup_renderer(const char *name)
+static inline struct renderer *lookup_renderer(const struct b6_utf8 *id)
 {
-	struct b6_entry *entry = b6_lookup_registry(&__base_registry, name);
+	struct b6_entry *entry = b6_lookup_registry(&__base_registry, id);
 	return entry ? b6_cast_of(entry, struct renderer, entry) : NULL;
 }
 

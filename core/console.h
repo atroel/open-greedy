@@ -68,9 +68,10 @@ static inline void show_console(struct console *self)
 
 extern struct b6_registry __console_registry;
 
-static inline int register_console(struct console *self, const char *name)
+static inline int register_console(struct console *self,
+				   const struct b6_utf8 *id)
 {
-	return b6_register(&__console_registry, &self->entry, name);
+	return b6_register(&__console_registry, &self->entry, id);
 }
 
 static inline void unregister_console(struct console *self)
@@ -78,9 +79,9 @@ static inline void unregister_console(struct console *self)
 	b6_unregister(&__console_registry, &self->entry);
 }
 
-static inline struct console *lookup_console(const char *name)
+static inline struct console *lookup_console(const struct b6_utf8 *id)
 {
-	struct b6_entry *entry = b6_lookup_registry(&__console_registry, name);
+	struct b6_entry *entry = b6_lookup_registry(&__console_registry, id);
 	return entry ? b6_cast_of(entry, struct console, entry) : NULL;
 }
 

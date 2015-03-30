@@ -190,21 +190,6 @@ static void menu_entry_renderer_on_render(struct renderer_observer *obs)
 	hide_toolkit_label(&self->label[!selected]);
 }
 
-static unsigned int text_len(const unsigned char *utf8, unsigned int size)
-{
-	unsigned int len;
-	for (len = 0; size; len += 1) {
-		int n = b6_utf8_dec_len(utf8);
-		if (n <= 0)
-			break;
-		if (n > size)
-			break;
-		utf8 += n;
-		size -= n;
-	}
-	return len;
-}
-
 static void initialize_menu_entry_renderer(struct menu_entry_renderer *self,
 					   const struct b6_clock *clock,
 					   struct renderer *renderer,
@@ -212,24 +197,23 @@ static void initialize_menu_entry_renderer(struct menu_entry_renderer *self,
 					   const struct fixed_font *normal_font,
 					   const struct fixed_font *bright_font,
 					   float x, float y,
-					   const void *utf8_data,
-					   unsigned int utf8_size)
+					   const struct b6_utf8 *utf8)
 {
 	static const struct renderer_observer_ops renderer_observer_ops = {
 		.on_render = menu_entry_renderer_on_render,
 	};
-	unsigned long int len = text_len(utf8_data, utf8_size);
+	unsigned long int len = utf8->nchars;
 	unsigned short int font_w = get_fixed_font_width(normal_font);
 	unsigned short int font_h = get_fixed_font_height(normal_font);
 	initialize_toolkit_label(&self->label[0], renderer, normal_font,
 				 len * font_w, font_h, base,
 				 x - len * 16 / 2, y, len * 16, 16);
-	set_toolkit_label_utf8(&self->label[0], utf8_data, utf8_size);
+	set_toolkit_label(&self->label[0], utf8);
 	enable_toolkit_label_shadow(&self->label[0]);
 	initialize_toolkit_label(&self->label[1], renderer, bright_font,
 				 len * font_w, font_h, base,
 				 x - len * 16 / 2, y, len * 16, 16);
-	set_toolkit_label_utf8(&self->label[1], utf8_data, utf8_size);
+	set_toolkit_label(&self->label[1], utf8);
 	enable_toolkit_label_shadow(&self->label[1]);
 	hide_toolkit_label(&self->label[1]);
 	self->clock = clock;
@@ -361,9 +345,7 @@ static int initialize_menu_renderer_entries(struct menu_renderer *self)
 					       self->renderer, root,
 					       &self->normal_font,
 					       &self->bright_font,
-					       x, y,
-					       entry->utf8_data,
-					       entry->utf8_size);
+					       x, y, &entry->utf8);
 		y += 40;
 	}
 	return 0;

@@ -155,7 +155,7 @@ static struct b6_json_object *get_embedded_lang(struct b6_json *json)
 	struct json_istream jis;
 	struct b6_json_parser_info info;
 	enum b6_json_error error;
-	if (!(embedded = lookup_embedded("lang.json")))
+	if (!(embedded = lookup_embedded(B6_UTF8("lang.json"))))
 		return NULL;
 	if (initialize_izbstream(&izbs, embedded->buf, embedded->len))
 		return NULL;
@@ -183,18 +183,20 @@ static int greedy(struct b6_clock *clock)
 	struct b6_json_object *languages = NULL;
 	struct preferences preferences;
 	struct engine engine;
+	struct b6_utf8 utf8;
 	puts("Open Greedy - Copyright (C) 2014-2015 Arnaud TROEL");
 	puts("This program comes with ABSOLUTELY NO WARRANTY.");
 	puts("This is free software, and you are welcome to redistribute it");
 	puts("under certain conditions; see COPYING file for details.");
 	fprintf(stderr, "Build: %s-%s-v%s\n", PLATFORM, BUILD, VERSION);
 	init_all();
-	if (!(console = lookup_console(console_name))) {
+	b6_utf8_from_ascii(&utf8, console_name);
+	if (!(console = lookup_console(&utf8))) {
 		log_e("unknown console: %s", console_name);
 		goto bail_out;
 	}
 	log_i("using %s console", console_name);
-	mixer = lookup_mixer("sdl");
+	mixer = lookup_mixer(B6_UTF8("sdl"));
 	if (open_mixer(mixer))
 		goto bail_out;
 	if (!(json = get_json()))
@@ -211,21 +213,14 @@ static int greedy(struct b6_clock *clock)
 		set_pref_fullscreen(&preferences, fs);
 	if (shuffle >= 0)
 		set_pref_shuffle(&preferences, shuffle);
-	if (mode && lookup_game_config(mode)) {
-		unsigned int utf8_size;
-		const void *utf8_data = b6_ascii_to_utf8(mode, &utf8_size);
-		set_pref_mode(&preferences, utf8_data, utf8_size);
+	if (mode) {
+		if (lookup_game_config(b6_utf8_from_ascii(&utf8, mode)))
+			set_pref_mode(&preferences, &utf8);
 	}
-	if (game) {
-		unsigned int utf8_size;
-		const void *utf8_data = b6_ascii_to_utf8(game, &utf8_size);
-		set_pref_game(&preferences, utf8_data, utf8_size);
-	}
-	if (lang) {
-		unsigned int utf8_size;
-		const void *utf8_data = b6_ascii_to_utf8(lang, &utf8_size);
-		set_pref_lang(&preferences, utf8_data, utf8_size);
-	}
+	if (game)
+		set_pref_game(&preferences, b6_utf8_from_ascii(&utf8, game));
+	if (lang)
+		set_pref_lang(&preferences, b6_utf8_from_ascii(&utf8, lang));
 	if (!setup_engine(&engine, clock, console, mixer, &preferences,
 			  languages)) {
 		run_engine(&engine);
@@ -249,6 +244,7 @@ int main(int argc, char *argv[])
 	struct b6_cmd *cmd;
 	int argn, retval;
 	struct b6_named_clock *clock_source = NULL;
+	struct b6_utf8 utf8;
 	install_crash_pad();
 	argn = b6_parse_command_line_flags(argc, argv, 0);
 	if (log_flag)
@@ -259,15 +255,19 @@ int main(int argc, char *argv[])
 		case 'E': case 'e': log_level = LOG_ERROR; break;
 		case 'P': case 'p': log_level = LOG_PANIC; break;
 		}
-	if (clock_name && !(clock_source = b6_lookup_named_clock(clock_name)))
-		log_e("cannot find clock %s", clock_name);
+	if (clock_name) {
+		b6_utf8_from_ascii(&utf8, clock_name);
+		if (!(clock_source = b6_lookup_named_clock(&utf8)))
+			log_e("cannot find clock %s", clock_name);
+	}
 	if (!clock_source && !(clock_source = b6_get_default_named_clock()))
 		log_p("cannot find a default clock");
 	log_clock = clock_source->clock;
-	log_i("using %s clock source", clock_source->entry.name);
+	log_i("using %s clock source", clock_source->entry.id->ptr);
 	if (argn <= 0)
 		log_p("error parsing command line");
-	if (argn < argc && (cmd = b6_lookup_cmd(argv[argn])))
+	if (argn < argc &&
+	    (cmd = b6_lookup_cmd(b6_utf8_from_ascii(&utf8, argv[argn]))))
 		retval = b6_exec_cmd(cmd, argc - argn, argv + argn);
 	else
 		retval = greedy(clock_source->clock);

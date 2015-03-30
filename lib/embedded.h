@@ -23,7 +23,7 @@
 #include <b6/registry.h>
 #include "lib/io.h"
 
-#define publish_embedded(_data, _size, _name) \
+#define publish_embedded(_data, _size, _id) \
 	static struct embedded embedded_ ## _data; \
 	b6_ctor(publish_embedded_ ## _data); \
 	static void publish_embedded_ ## _data(void) \
@@ -32,7 +32,7 @@
 		self->buf = _data; \
 		self->len = sizeof(_data); \
 		self->uncompressed_len = _size; \
-		register_embedded(self, _name); \
+		register_embedded(self, _id); \
 	} \
 	static struct embedded embedded_ ## _data
 
@@ -45,9 +45,10 @@ struct embedded {
 
 extern struct b6_registry __embedded_registry;
 
-static inline int register_embedded(struct embedded *self, const char *name)
+static inline int register_embedded(struct embedded *self,
+				    const struct b6_utf8 *id)
 {
-	return b6_register(&__embedded_registry, &self->entry, name);
+	return b6_register(&__embedded_registry, &self->entry, id);
 }
 
 static inline void unregister_embedded(struct embedded *self)
@@ -55,9 +56,9 @@ static inline void unregister_embedded(struct embedded *self)
 	b6_unregister(&__embedded_registry, &self->entry);
 }
 
-static inline struct embedded *lookup_embedded(const char *name)
+static inline struct embedded *lookup_embedded(const struct b6_utf8 *id)
 {
-	struct b6_entry *entry = b6_lookup_registry(&__embedded_registry, name);
+	struct b6_entry *entry = b6_lookup_registry(&__embedded_registry, id);
 	return entry ? b6_cast_of(entry, struct embedded, entry) : NULL;
 }
 

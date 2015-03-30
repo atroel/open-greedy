@@ -24,12 +24,13 @@
 #include "items.h"
 #include "level.h"
 #include <b6/registry.h>
+#include <b6/utf8.h>
 
 extern const char *level_data_type;
 extern const char *audio_data_type;
 extern const char *image_data_type;
 
-#define __DATA_ID(skin_id, type_id, data_id) skin_id "." type_id "." data_id
+#define __DATA_ID(skin_id, type_id, data_id) (skin_id "." type_id "." data_id)
 #define DATA_ID(skin_id, type_id, data_id) __DATA_ID(skin_id, type_id, data_id)
 #define LEVEL_DATA_ID(skin_id, data_id) DATA_ID(skin_id, "level", data_id)
 #define AUDIO_DATA_ID(skin_id, data_id) DATA_ID(skin_id, "audio", data_id)
@@ -53,7 +54,7 @@ extern struct b6_registry __data_registry;
 
 static inline int register_data(struct data_entry *self,
 				const struct data_entry_ops *ops,
-				const char *name)
+				const struct b6_utf8 *name)
 {
 	self->ops = ops;
 	return b6_register(&__data_registry, &self->entry, name);
@@ -64,19 +65,8 @@ static inline void unregister_data(struct data_entry *self)
 	b6_unregister(&__data_registry, &self->entry);
 }
 
-extern int make_data_path(char *buf, unsigned long int len,
-			  const char *root, const char *type, const char *what);
-
-static inline struct data_entry *lookup_data(const char *skin, const char *type,
-					     const char *what)
-{
-	char path[256];
-	struct b6_entry *entry;
-	if (make_data_path(path, sizeof(path), skin, type, what))
-		return NULL;
-	entry = b6_lookup_registry(&__data_registry, path);
-	return entry ? b6_cast_of(entry, struct data_entry, entry) : NULL;
-}
+extern struct data_entry *lookup_data(const char *skin, const char *type,
+				      const char *what);
 
 static inline struct istream *get_data(struct data_entry *entry)
 {

@@ -46,6 +46,26 @@ int make_data_path(char *buf, unsigned long int len, const char *root,
 	return -(snprintf(buf, len, "%s.%s.%s", root, type, what) >= len);
 }
 
+struct data_entry *lookup_data(const char *skin, const char *type,
+			       const char *what)
+{
+	char buffer[1024];
+	struct b6_fixed_allocator allocator;
+	struct b6_utf8_string path;
+	struct b6_entry *entry = NULL;
+	struct b6_utf8 slice;
+	b6_reset_fixed_allocator(&allocator, buffer, sizeof(buffer));
+	b6_initialize_utf8_string(&path, &allocator.allocator);
+	if (!b6_extend_utf8_string(&path, b6_utf8_from_ascii(&slice, skin)) &&
+	    !b6_extend_utf8_string(&path, &b6_utf8_char['.']) &&
+	    !b6_extend_utf8_string(&path, b6_utf8_from_ascii(&slice, type)) &&
+	    !b6_extend_utf8_string(&path, &b6_utf8_char['.']) &&
+	    !b6_extend_utf8_string(&path, b6_utf8_from_ascii(&slice, what)))
+		entry = b6_lookup_registry(&__data_registry, &path.utf8);
+	b6_finalize_utf8_string(&path);
+	return entry ? b6_cast_of(entry, struct data_entry, entry) : NULL;
+}
+
 int get_image_data_no_fallback(const char *skin_id, const char *data_id,
 			       void *param, struct data_entry **entry,
 			       struct image_data **data)

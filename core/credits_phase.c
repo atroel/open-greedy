@@ -129,7 +129,7 @@ static void on_key_pressed(struct controller_observer *observer,
 	struct credits_phase *self = b6_cast_of(observer, struct credits_phase,
 						controller_observer);
 	if (key == CTRLK_RETURN || key == CTRLK_ESCAPE)
-		self->next = lookup_phase("menu");
+		self->next = lookup_phase(B6_UTF8("menu"));
 }
 
 static int credits_phase_init(struct phase *up, const struct phase *prev)
@@ -152,7 +152,7 @@ static int credits_phase_init(struct phase *up, const struct phase *prev)
 	font_w = get_fixed_font_width(&self->font);
 	font_h = get_fixed_font_height(&self->font);
 	lang = b6_json_value_as(get_engine_language(up->engine)->value, object);
-	if (!(array = b6_json_get_object_as(lang, "credits", array))) {
+	if (!(array = b6_json_get_object_as(lang, B6_UTF8("credits"), array))) {
 		log_e("cannot find credits text");
 		finalize_fixed_font(&self->font);
 		return -1;
@@ -186,9 +186,7 @@ static int credits_phase_init(struct phase *up, const struct phase *prev)
 						string);
 		if (!text)
 			continue;
-		set_toolkit_label_utf8(&self->lines[i],
-				       b6_json_string_utf8(text),
-				       b6_json_string_size(text));
+		set_toolkit_label(&self->lines[i], b6_json_get_string(text));
 	}
 	if ((data = lookup_data(credits_skin, audio_data_type,
 				CREDITS_MUSIC_DATA_ID)) &&
@@ -241,6 +239,6 @@ static int credits_phase_ctor(void)
 		.exec = credits_phase_exec,
 	};
 	static struct credits_phase credits_phase;
-	return register_phase(&credits_phase.up, "credits", &ops);
+	return register_phase(&credits_phase.up, B6_UTF8("credits"), &ops);
 }
 register_init(credits_phase_ctor);

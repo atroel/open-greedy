@@ -23,6 +23,8 @@
 #include "rgba.h"
 #include "renderer.h"
 
+struct b6_utf8;
+
 struct fixed_font {
 	struct rgba rgba[96];
 };
@@ -34,14 +36,9 @@ extern void initialize_fixed_font(struct fixed_font *self,
 
 extern void finalize_fixed_font(struct fixed_font *self);
 
-extern void render_fixed_font(const struct fixed_font *self, const char *s,
-			      struct rgba *rgba,
+extern void render_fixed_font(const struct fixed_font *self,
+			      const struct b6_utf8 *utf8, struct rgba *rgba,
 			      unsigned short int x, unsigned short int y);
-
-extern void render_fixed_font_utf8(const struct fixed_font *self,
-				   const void *s, unsigned int n,
-				   struct rgba *rgba,
-				   unsigned short int x, unsigned short int y);
 
 static inline unsigned short int get_fixed_font_width(
 	const struct fixed_font *self)
@@ -99,10 +96,8 @@ extern void enable_toolkit_label_shadow(struct toolkit_label *self);
 
 extern void disable_toolkit_label_shadow(struct toolkit_label *self);
 
-extern int set_toolkit_label(struct toolkit_label *self, const char *text);
-
-extern int set_toolkit_label_utf8(struct toolkit_label *self, const void *utf8,
-				  unsigned int len);
+extern int set_toolkit_label(struct toolkit_label *self,
+			     const struct b6_utf8 *text);
 
 static inline void show_toolkit_label(struct toolkit_label *self)
 {

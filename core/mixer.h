@@ -154,9 +154,9 @@ static inline void set_music_pos(struct mixer *self, int pos)
 
 extern struct b6_registry __mixer_registry;
 
-static inline int register_mixer(struct mixer *self, const char *name)
+static inline int register_mixer(struct mixer *self, const struct b6_utf8 *id)
 {
-	return b6_register(&__mixer_registry, &self->entry, name);
+	return b6_register(&__mixer_registry, &self->entry, id);
 }
 
 static inline void unregister_mixer(struct mixer *self)
@@ -164,9 +164,9 @@ static inline void unregister_mixer(struct mixer *self)
 	b6_unregister(&__mixer_registry, &self->entry);
 }
 
-static inline struct mixer *lookup_mixer(const char *name)
+static inline struct mixer *lookup_mixer(const struct b6_utf8 *id)
 {
-	struct b6_entry *entry = b6_lookup_registry(&__mixer_registry, name);
+	struct b6_entry *entry = b6_lookup_registry(&__mixer_registry, id);
 	return entry ? b6_cast_of(entry, struct mixer, entry) : NULL;
 }
 

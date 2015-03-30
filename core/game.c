@@ -1335,8 +1335,10 @@ static struct game_config fast_game_config = {
 
 static int register_game_configs(void)
 {
-	b6_register(&__game_config_registry, &slow_game_config.entry, "slow");
-	b6_register(&__game_config_registry, &fast_game_config.entry, "fast");
+	b6_register(&__game_config_registry, &slow_game_config.entry,
+		    B6_UTF8("slow"));
+	b6_register(&__game_config_registry, &fast_game_config.entry,
+		    B6_UTF8("fast"));
 	return 0;
 }
 register_init(register_game_configs);

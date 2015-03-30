@@ -45,13 +45,13 @@ struct cached_image_data {
 
 extern int register_buffered_data(struct buffered_data_entry *self,
 				  const void *buf, unsigned int len,
-				  const char *name);
+				  const struct b6_utf8 *id);
 
 extern void unregister_buffered_data(struct buffered_data_entry *self);
 
 extern int register_cached_image_data(struct cached_image_data *self,
 				      const void *buf, unsigned int len,
-				      const char *name);
+				      const struct b6_utf8 *id);
 
 void unregister_cached_image_data(struct cached_image_data *self);
 

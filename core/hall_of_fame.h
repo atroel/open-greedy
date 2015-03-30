@@ -34,7 +34,7 @@ struct hall_of_fame {
 	struct b6_entry entry;
 	struct b6_list list;
 	struct hall_of_fame_entry entries[10];
-	char name[256];
+	struct b6_utf8_string name;
 };
 
 struct hall_of_fame_iterator {
@@ -60,8 +60,8 @@ static inline struct hall_of_fame_entry *hall_of_fame_iterator_next(
 	return entry;
 }
 
-extern struct hall_of_fame *load_hall_of_fame(const char *levels_name,
-					      const char *config_name);
+extern struct hall_of_fame *load_hall_of_fame(
+	const char *levels_name, const struct b6_utf8 *config_name);
 
 extern int save_hall_of_fame(struct hall_of_fame*);
 

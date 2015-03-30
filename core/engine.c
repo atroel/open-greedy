@@ -74,18 +74,16 @@ static int setup_engine_language(struct engine *self,
 				 struct b6_json_object *languages)
 {
 	const struct b6_json_pair *pair;
-	const void *utf8_data;
-	unsigned int utf8_size;
+	const struct b6_utf8 *utf8;
 	self->languages = languages;
-	if ((utf8_data = get_pref_lang(self->pref, &utf8_size))) {
-		b6_json_setup_iterator_at_utf8(&self->iter, languages,
-					       utf8_data, utf8_size);
+	if ((utf8 = get_pref_lang(self->pref))) {
+		b6_json_setup_iterator_at(&self->iter, languages, utf8);
 		pair = b6_json_get_iterator(&self->iter);
 		if (pair && b6_json_value_is_of(pair->value, object))
 			return 0;
 		log_w("cannot find preferences language");
 	}
-	b6_json_setup_iterator_at(&self->iter, languages, "en");
+	b6_json_setup_iterator_at(&self->iter, languages, B6_UTF8("en"));
 	pair = b6_json_get_iterator(&self->iter);
 	if (pair && b6_json_value_is_of(pair->value, object)) {
 		log_i("falling back to \"en\" language");
@@ -109,14 +107,11 @@ void get_last_game_result(struct engine *self, struct game_result *result)
 
 void set_last_game_result(struct engine *self, const struct game_result *result)
 {
-	const void *game_utf8 = self->layout_provider->entry.name;
-	unsigned int game_size = self->layout_provider->entry.size;
-	const void *mode_utf8 = self->game_config->entry.name;
-	unsigned int mode_size = self->game_config->entry.size;
 	self->game_result.level = result->level;
 	self->game_result.score = result->score;
-	set_pref_level(self->pref, result->level, game_utf8, game_size,
-		       mode_utf8, mode_size);
+	set_pref_level(self->pref, result->level,
+		       self->layout_provider->entry.id,
+		       self->game_config->entry.id);
 }
 
 int setup_engine(struct engine *self, const struct b6_clock *clock,
@@ -128,8 +123,7 @@ int setup_engine(struct engine *self, const struct b6_clock *clock,
 		.on_focus_in = on_focus_in,
 		.on_focus_out = on_focus_out,
 	};
-	const void *utf8;
-	unsigned int size;
+	const struct b6_utf8 *utf8;
 	int retval;
 	setup_controller_observer(&self->observer, &ops);
 	self->clock = clock;
@@ -140,16 +134,16 @@ int setup_engine(struct engine *self, const struct b6_clock *clock,
 	set_console_vsync(get_pref_vsync(self->pref));
 	if ((retval = setup_engine_language(self, languages)))
 		return retval;
-	if (!(utf8 = get_pref_game(self->pref, &size)))
-		utf8 = b6_ascii_to_utf8("Greedy XP", &size);
-	if (!(self->layout_provider = lookup_layout_provider(utf8, size))) {
+	if (!(utf8 = get_pref_game(self->pref)))
+		utf8 = B6_UTF8("Greedy XP");
+	if (!(self->layout_provider = lookup_layout_provider(utf8))) {
 		self->layout_provider = get_default_layout_provider();
-		log_w("Falling back to %s.", self->layout_provider->entry.name);
+		log_w("Falling back to default level set."); /* FIXME */
 	}
 	self->quit = 0;
 	self->game_config = NULL;
-	if ((utf8 = get_pref_mode(self->pref, &size))) {
-		self->game_config = lookup_game_config_utf8(utf8, size);
+	if ((utf8 = get_pref_mode(self->pref))) {
+		self->game_config = lookup_game_config(utf8);
 		if (!self->game_config)
 			log_w("unknown specified game mode");
 	} else
@@ -158,16 +152,12 @@ int setup_engine(struct engine *self, const struct b6_clock *clock,
 		log_w("falling back default to game mode");
 		self->game_config = get_default_game_config();
 	}
-	set_pref_mode(self->pref, self->game_config->entry.name,
-		      self->game_config->entry.size);
+	set_pref_mode(self->pref, self->game_config->entry.id);
 	self->game_result.score = 0;
 	self->game_result.level = get_pref_level(
-		self->pref,
-		self->layout_provider->entry.name,
-		self->layout_provider->entry.size,
-		self->game_config->entry.name,
-		self->game_config->entry.size);
-	self->curr = lookup_phase("menu");
+		self->pref, self->layout_provider->entry.id,
+		self->game_config->entry.id);
+	self->curr = lookup_phase(B6_UTF8("menu"));
 	return 0;
 }
 

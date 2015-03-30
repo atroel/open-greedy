@@ -157,7 +157,7 @@ static const struct image_data_ops greedy_layout_ops = {
 };
 
 static int register_greedy_image_data(struct greedy_image_data *self,
-				      const char *name,
+				      const struct b6_utf8 *name,
 				      const char *data_id,
 				      const struct image_data_ops *ops,
 				      unsigned short int *x,
@@ -201,7 +201,8 @@ static void setup_greedy_image_xy(struct greedy_image_data *self,
 }
 
 static void register_greedy_data_entry(struct greedy_data_entry *self,
-				       const char *name, const char *path)
+				       const struct b6_utf8 *name,
+				       const char *path)
 {
 	initialize_membuf(&self->membuf, &b6_std_allocator);
 	if (!load_external_data(&self->membuf, path))
@@ -228,38 +229,45 @@ do { \
 	if (!load_external_data(&data.membuf, "greedy/image/" _path ".tga.z")) \
 		register_cached_image_data( \
 			&data.up, data.membuf.buf, data.membuf.len, \
-			IMAGE_DATA_ID("greedy", _name)); \
+			B6_UTF8(IMAGE_DATA_ID("greedy", _name))); \
 } while (0)
 
 #define register_greedy_audio(name, path) do { \
+	static const struct b6_utf8 slice = \
+		B6_DEFINE_UTF8(AUDIO_DATA_ID("greedy", name)); \
 	static struct greedy_data_entry data; \
-	register_greedy_data_entry(&data, AUDIO_DATA_ID("greedy", name), \
-				   "greedy/audio/" path ".z"); \
+	register_greedy_data_entry(&data, &slice, "greedy/audio/" path ".z"); \
 } while(0)
 
 #define register_greedy_level(num) \
 	do { \
+		static const struct b6_utf8 slice = \
+			B6_DEFINE_UTF8(LEVEL_DATA_ID("greedy", num)); \
 		static struct greedy_data_entry data; \
 		register_greedy_data_entry( \
-			&data, LEVEL_DATA_ID("greedy", num), \
-			"greedy/level/level_" num ".lev.z"); \
+			&data, &slice, "greedy/level/level_" num ".lev.z"); \
 	} while(0)
 
 #define register_greedy_pacman(m, d, x, y) do { \
+	static const struct b6_utf8 slice = B6_DEFINE_UTF8( \
+	       IMAGE_DATA_ID("greedy", GAME_PACMAN_DATA_ID(m, d))); \
 	static struct greedy_image_data data; \
 	static unsigned short int data_x[10], data_y[10]; \
-	register_greedy_image_data( \
-		&data, IMAGE_DATA_ID("greedy", GAME_PACMAN_DATA_ID(m, d)), \
-		GREEDY_GAME_SPRITE, &greedy_image_ops, data_x, data_y, \
-		32, 32, 10, 50000); \
+	register_greedy_image_data(&data, &slice, GREEDY_GAME_SPRITE, \
+				   &greedy_image_ops, data_x, data_y, \
+				   32, 32, 10, 50000); \
 	setup_greedy_image_xy(&data, x, y, 1, 0); \
 } while (0)
 
 #define GREEDY_GHOST_MODE_DATA_ID(n, mode) { \
-	IMAGE_DATA_ID("greedy", GAME_GHOST_DATA_ID(n, mode, "e")), \
-	IMAGE_DATA_ID("greedy", GAME_GHOST_DATA_ID(n, mode, "w")), \
-	IMAGE_DATA_ID("greedy", GAME_GHOST_DATA_ID(n, mode, "s")), \
-	IMAGE_DATA_ID("greedy", GAME_GHOST_DATA_ID(n, mode, "n")), \
+	B6_DEFINE_UTF8( \
+		IMAGE_DATA_ID("greedy", GAME_GHOST_DATA_ID(n, mode, "e"))), \
+	B6_DEFINE_UTF8( \
+		IMAGE_DATA_ID("greedy", GAME_GHOST_DATA_ID(n, mode, "w"))), \
+	B6_DEFINE_UTF8( \
+		IMAGE_DATA_ID("greedy", GAME_GHOST_DATA_ID(n, mode, "s"))), \
+	B6_DEFINE_UTF8( \
+		IMAGE_DATA_ID("greedy", GAME_GHOST_DATA_ID(n, mode, "n"))), \
 }
 
 #define GREEDY_GHOST_DATA_ID(n) { \
@@ -270,11 +278,12 @@ do { \
 }
 
 #define register_greedy_single(data_id, entry, x, y, w, h) do { \
+	static const struct b6_utf8 slice = \
+		B6_DEFINE_UTF8(IMAGE_DATA_ID("greedy", data_id)); \
 	static struct greedy_image_data data; \
 	static unsigned short int data_x = x, data_y = y; \
-	register_greedy_image_data( \
-		&data, IMAGE_DATA_ID("greedy", data_id), entry, \
-		&greedy_image_ops, &data_x, &data_y, w, h, 1, 0); \
+	register_greedy_image_data(&data, &slice, entry, &greedy_image_ops, \
+				   &data_x, &data_y, w, h, 1, 0); \
 } while (0)
 
 #define register_greedy_jewel(n) register_greedy_single( \
@@ -288,13 +297,13 @@ do { \
 	data_id, GREEDY_GAME_OPTION, x, y, 32, 32)
 
 #define register_greedy_bonus(data_id, x, y, n, p) do { \
+	static const struct b6_utf8 slice = B6_DEFINE_UTF8( \
+		IMAGE_DATA_ID("greedy", GAME_BONUS_ ## data_id ## _DATA_ID)); \
 	static struct greedy_image_data data; \
 	static unsigned short int data_x[n], data_y[n]; \
-	register_greedy_image_data( \
-		&data, \
-		IMAGE_DATA_ID("greedy", GAME_BONUS_ ## data_id ## _DATA_ID), \
-		GREEDY_GAME_OPTION, &greedy_image_ops, data_x, data_y, \
-		32, 32, n, p); \
+	register_greedy_image_data(&data, &slice, GREEDY_GAME_OPTION, \
+				   &greedy_image_ops, data_x, data_y, \
+				   32, 32, n, p); \
 	setup_greedy_image_xy(&data, x, y, 1, 0); \
 } while (0)
 
@@ -349,7 +358,8 @@ static int greedy_skin_ctor(void)
 	register_greedy_level("77"); register_greedy_level("78");
 	if (reset_data_layout_provider(&layout_provider, "greedy"))
 		log_w("No levels: skipping registration.");
-	else if (register_layout_provider(&layout_provider.up, "Greedy XP"))
+	else if (register_layout_provider(&layout_provider.up,
+					  B6_UTF8("Greedy XP")))
 		log_e("Could not register levels.");
 
 	greedy_image_resource(GREEDY_FONT, "font");
@@ -388,14 +398,14 @@ static int greedy_skin_ctor(void)
 	static struct greedy_image_data menu_normal_font_data;
 	register_greedy_image_data(
 		&menu_normal_font_data,
-		IMAGE_DATA_ID("greedy", MENU_NORMAL_FONT_DATA_ID),
+		B6_UTF8(IMAGE_DATA_ID("greedy", MENU_NORMAL_FONT_DATA_ID)),
 		GREEDY_FONT, &greedy_image_ops, font_x[0], font_y[0],
 		font_w, font_h, b6_card_of(font_x[1]), 0);
 
 	static struct greedy_image_data menu_bright_font_data;
 	register_greedy_image_data(
 		&menu_bright_font_data,
-		IMAGE_DATA_ID("greedy", MENU_BRIGHT_FONT_DATA_ID),
+		B6_UTF8(IMAGE_DATA_ID("greedy", MENU_BRIGHT_FONT_DATA_ID)),
 		GREEDY_FONT, &greedy_image_ops, font_x[2], font_y[2],
 		font_w, font_h, b6_card_of(font_x[2]), 0);
 
@@ -412,7 +422,8 @@ static int greedy_skin_ctor(void)
 
 	static struct greedy_image_data hof_font_data;
 	register_greedy_image_data(
-		&hof_font_data, IMAGE_DATA_ID("greedy", HOF_FONT_DATA_ID),
+		&hof_font_data,
+		B6_UTF8(IMAGE_DATA_ID("greedy", HOF_FONT_DATA_ID)),
 		GREEDY_FONT, &greedy_image_ops, font_x[0], font_y[0],
 		font_w, font_h, b6_card_of(font_x[0]), 0);
 
@@ -423,7 +434,8 @@ static int greedy_skin_ctor(void)
 
 	static struct greedy_image_data game_font_data;
 	register_greedy_image_data(
-		&game_font_data, IMAGE_DATA_ID("greedy", GAME_FONT_DATA_ID),
+		&game_font_data,
+		B6_UTF8(IMAGE_DATA_ID("greedy", GAME_FONT_DATA_ID)),
 		GREEDY_FONT, &greedy_image_ops, font_x[1], font_y[1],
 		font_w, font_h, b6_card_of(font_x[1]), 0);
 
@@ -461,7 +473,7 @@ static int greedy_skin_ctor(void)
 	register_greedy_pacman("shield", "s", 0, 192);
 	register_greedy_pacman("shield", "n", 0, 224);
 
-	static const char *ghost_data_id[4][4][4] = {
+	static const struct b6_utf8 ghost_data_id[4][4][4] = {
 		GREEDY_GHOST_DATA_ID(0),
 		GREEDY_GHOST_DATA_ID(1),
 		GREEDY_GHOST_DATA_ID(2),
@@ -479,22 +491,22 @@ static int greedy_skin_ctor(void)
 	for (i = 0; i < b6_card_of(ghost_data); i += 1)
 		for (j = 0; j < b6_card_of(ghost_data[i][0]); j += 1) {
 			register_greedy_image_data(
-				&ghost_data[i][0][j], ghost_data_id[i][0][j],
+				&ghost_data[i][0][j], &ghost_data_id[i][0][j],
 				GREEDY_GAME_SPRITE, &greedy_image_ops,
 				ghost_normal_x[i], ghost_normal_y[i], 32, 32,
 				b6_card_of(ghost_normal_x[i]), 75000);
 			register_greedy_image_data(
-				&ghost_data[i][1][j], ghost_data_id[i][1][j],
+				&ghost_data[i][1][j], &ghost_data_id[i][1][j],
 				GREEDY_GAME_SPRITE, &greedy_image_ops,
 				ghost_afraid_x, ghost_afraid_y, 32, 32,
 				b6_card_of(ghost_afraid_x), 75000);
 			register_greedy_image_data(
-				&ghost_data[i][2][j], ghost_data_id[i][2][j],
+				&ghost_data[i][2][j], &ghost_data_id[i][2][j],
 				GREEDY_GAME_SPRITE, &greedy_image_ops,
 				ghost_locked_x, ghost_locked_y, 32, 32,
 				b6_card_of(ghost_locked_x), 75000);
 			register_greedy_image_data(
-				&ghost_data[i][3][j], ghost_data_id[i][3][j],
+				&ghost_data[i][3][j], &ghost_data_id[i][3][j],
 				GREEDY_GAME_SPRITE, &greedy_image_ops,
 				&ghost_zombie_x, &ghost_zombie_y, 32, 32,
 				1, 1);
@@ -508,7 +520,8 @@ static int greedy_skin_ctor(void)
 	static struct greedy_image_data booster_data;
 	static unsigned short int booster_x[2], booster_y[2];
 	register_greedy_image_data(
-		&booster_data, IMAGE_DATA_ID("greedy", GAME_BOOSTER_DATA_ID),
+		&booster_data,
+		B6_UTF8(IMAGE_DATA_ID("greedy", GAME_BOOSTER_DATA_ID)),
 		GREEDY_GAME_SPRITE, &greedy_image_ops, booster_x, booster_y,
 		185, 10, 2, 0);
 	setup_greedy_image_xy(&booster_data, 320, 192, 0, 1);
@@ -516,7 +529,8 @@ static int greedy_skin_ctor(void)
 	static struct greedy_image_data casino_data;
 	static unsigned short int casino_x[56], casino_y[b6_card_of(casino_x)];
 	register_greedy_image_data(
-		&casino_data, IMAGE_DATA_ID("greedy", GAME_CASINO_DATA_ID),
+		&casino_data,
+		B6_UTF8(IMAGE_DATA_ID("greedy", GAME_CASINO_DATA_ID)),
 		GREEDY_GAME_SPRITE, &greedy_image_ops, casino_x, casino_y,
 		22, 18, b6_card_of(casino_x), 0);
 	for (i = 0; i < b6_card_of(casino_x); i += 1) {
@@ -619,14 +633,15 @@ static int greedy_skin_ctor(void)
 	static unsigned short int super_pacgum_y[] = { 248, 248 };
 	register_greedy_image_data(
 		&super_pacgum_data,
-		IMAGE_DATA_ID("greedy", GAME_SUPER_PACGUM_DATA_ID),
+		B6_UTF8(IMAGE_DATA_ID("greedy", GAME_SUPER_PACGUM_DATA_ID)),
 		GREEDY_GAME_SPRITE, &greedy_image_ops,
 		super_pacgum_x, super_pacgum_y, 16, 16, 2, 500000);
 
 	static struct greedy_image_data layout_data;
 	static struct rgba layout_rgba;
 	register_greedy_image_data(
-		&layout_data, IMAGE_DATA_ID("greedy", GAME_LAYOUT_DATA_ID),
+		&layout_data,
+		B6_UTF8(IMAGE_DATA_ID("greedy", GAME_LAYOUT_DATA_ID)),
 		GREEDY_GAME_PATTERN, &greedy_layout_ops, NULL, NULL,
 	       	0, 0, 0, 0);
 	layout_data.image_data.rgba = &layout_rgba;
@@ -635,7 +650,7 @@ static int greedy_skin_ctor(void)
 	static unsigned short int pacman_wins_x[20], pacman_wins_y[20];
 	register_greedy_image_data(
 		&pacman_wins_data,
-		IMAGE_DATA_ID("greedy", GAME_PACMAN_WINS_DATA_ID),
+		B6_UTF8(IMAGE_DATA_ID("greedy", GAME_PACMAN_WINS_DATA_ID)),
 		GREEDY_GAME_ANIMATION, &greedy_image_ops, pacman_wins_x,
 		pacman_wins_y, 32, 32, b6_card_of(pacman_wins_x), 75000);
 	setup_greedy_image_xy(&pacman_wins_data, 0, 64, 1, 0);
@@ -644,7 +659,7 @@ static int greedy_skin_ctor(void)
 	static unsigned short int pacman_loses_x[16], pacman_loses_y[16];
 	register_greedy_image_data(
 		&pacman_loses_data,
-		IMAGE_DATA_ID("greedy", GAME_PACMAN_LOSES_DATA_ID),
+		B6_UTF8(IMAGE_DATA_ID("greedy", GAME_PACMAN_LOSES_DATA_ID)),
 		GREEDY_GAME_ANIMATION, &greedy_image_ops, pacman_loses_x,
 		pacman_loses_y, 32, 32, b6_card_of(pacman_loses_x), 75000);
 	setup_greedy_image_xy(&pacman_loses_data, 0, 32, 1, 0);

@@ -23,6 +23,7 @@
 #include <b6/utf8.h>
 
 #include "lib/init.h"
+#include "lib/std.h"
 
 #include "console.h"
 #include "controller.h"
@@ -86,7 +87,7 @@ struct game_options_menu {
 	struct menu_entry mode;
 	struct menu_entry shuffle;
 	struct menu_entry back;
-	struct b6_json_string *game_label;
+	struct b6_utf8_string game_label;
 };
 
 struct video_options_menu {
@@ -113,6 +114,9 @@ struct menu_phase {
 	struct b6_json_object *lang;
 	struct submenu *submenu;
 	struct phase *next;
+	struct phase *game_phase;
+	struct phase *credits_phase;
+	struct phase *hof_phase;
 };
 
 static const char *menu_skin = NULL;
@@ -138,46 +142,27 @@ static void enter_main(struct submenu *up, const struct b6_json_object *lang)
 	set_quit_entry(&up->menu_phase->menu, &self->quit);
 }
 
-static void setup_menu_entry_utf8(struct menu_entry *entry,
-				  const struct b6_json_object *lang,
-				  const void *utf8, unsigned int size)
-{
-	const struct b6_json_string *text =
-		b6_json_get_object_utf8_as(lang, utf8, size, string);
-	if (!text) {
-		log_w("could not find menu text entry");
-		entry->utf8_data = utf8;
-		entry->utf8_size = size;
-	} else {
-		entry->utf8_data = b6_json_string_utf8(text);
-		entry->utf8_size = b6_json_string_size(text);
-	}
-}
-
 static void setup_menu_entry(struct menu_entry *entry,
 			     const struct b6_json_object *lang,
-			     const char *key)
+			     const struct b6_utf8 *key)
 {
-	const struct b6_json_string *text =
-		b6_json_get_object_as(lang, key, string);
-	if (!text) {
-		log_w("could not find menu text entry \"%s\"", key);
-		entry->utf8_data = b6_ascii_to_utf8(key, &entry->utf8_size);
-	} else {
-		entry->utf8_data = b6_json_string_utf8(text);
-		entry->utf8_size = b6_json_string_size(text);
-	}
+	const struct b6_json_string *text;
+	if (!(text = b6_json_get_object_as(lang, key, string)))
+		log_w("could not find menu text entry");
+	else
+		key = b6_json_get_string(text);
+	b6_clone_utf8(&entry->utf8, key);
 }
 
 static void update_main(struct submenu *up, const struct b6_json_object *lang)
 {
 	struct main_menu *self = b6_cast_of(up, struct main_menu, up);
-	setup_menu_entry(&self->resume, lang, "resume");
-	setup_menu_entry(&self->play, lang, "play");
-	setup_menu_entry(&self->options, lang, "options");
-	setup_menu_entry(&self->hof, lang, "hof");
-	setup_menu_entry(&self->credits, lang, "credits");
-	setup_menu_entry(&self->quit, lang, "quit");
+	setup_menu_entry(&self->resume, lang, B6_UTF8("resume"));
+	setup_menu_entry(&self->play, lang, B6_UTF8("play"));
+	setup_menu_entry(&self->options, lang, B6_UTF8("options"));
+	setup_menu_entry(&self->hof, lang, B6_UTF8("hof"));
+	setup_menu_entry(&self->credits, lang, B6_UTF8("credits"));
+	setup_menu_entry(&self->quit, lang, B6_UTF8("quit"));
 }
 
 static struct submenu *select_main(struct submenu *up, struct menu_entry *entry)
@@ -187,17 +172,17 @@ static struct submenu *select_main(struct submenu *up, struct menu_entry *entry)
 	if (entry == &self->options)
 		return &up->menu_phase->options_menu.up;
 	else if (entry == &self->resume)
-		phase->next = lookup_phase("game");
+		phase->next = phase->game_phase;
 	else if (entry == &self->play) {
 		struct game_result game_result = { .score = 0, .level = 0, };
 		set_last_game_result(up->engine, &game_result);
-		phase->next = lookup_phase("game");
+		phase->next = phase->game_phase;
 	} else if (entry == &self->quit)
 		phase->next = NULL;
 	else if (entry == &self->hof)
-		phase->next = lookup_phase("hall_of_fame");
+		phase->next = phase->hof_phase;
 	else if (entry == &self->credits)
-		phase->next = lookup_phase("credits");
+		phase->next = phase->credits_phase;
 	return up;
 }
 
@@ -216,10 +201,12 @@ static void update_options(struct submenu *up,
 			   const struct b6_json_object *lang)
 {
 	struct options_menu *self = b6_cast_of(up, struct options_menu, up);
-	setup_menu_entry(&self->game_options, lang, "game_options");
-	setup_menu_entry(&self->video_options, lang, "video_options");
-	setup_menu_entry(&self->lang, lang, "lang");
-	setup_menu_entry(&self->back, lang, "back");
+	setup_menu_entry(&self->game_options, lang,
+			 B6_UTF8("game_options"));
+	setup_menu_entry(&self->video_options, lang,
+			 B6_UTF8("video_options"));
+	setup_menu_entry(&self->lang, lang, B6_UTF8("lang"));
+	setup_menu_entry(&self->back, lang, B6_UTF8("back"));
 }
 
 static struct submenu *select_options(struct submenu *up,
@@ -238,11 +225,11 @@ static struct submenu *select_options(struct submenu *up,
 		struct b6_json_object *lang;
 		rotate_engine_language(phase->up.engine);
 		pair = get_engine_language(phase->up.engine);
-		set_pref_lang(up->engine->pref, b6_json_string_utf8(pair->key),
-			      b6_json_string_size(pair->key));
+		set_pref_lang(up->engine->pref, b6_json_get_string(pair->key));
 		lang = b6_json_value_as(get_engine_language(up->engine)->value,
 					object);
-		phase->lang = b6_json_get_object_as(lang, "menu", object);
+		phase->lang = b6_json_get_object_as(lang, B6_UTF8("menu"),
+						    object);
 	} while (!phase->lang);
 	return up;
 }
@@ -258,7 +245,7 @@ static void enter_game_options(struct submenu *up,
 	add_menu_entry(&phase->menu, &self->mode);
 	add_menu_entry(&phase->menu, &self->back);
 	set_quit_entry(&phase->menu, &self->back);
-	self->game_label = NULL;
+	b6_initialize_utf8_string(&self->game_label, &b6_std_allocator);
 }
 
 static void update_game_options(struct submenu *up,
@@ -267,32 +254,20 @@ static void update_game_options(struct submenu *up,
 	struct game_options_menu *self =
 		b6_cast_of(up, struct game_options_menu, up);
 	struct b6_json_string *text;
-	const void *utf8_data;
-	unsigned int utf8_size;
-	utf8_data = b6_ascii_to_utf8(up->engine->layout_provider->entry.name,
-				     &utf8_size);
-	set_pref_game(up->engine->pref, utf8_data, utf8_size);
-	if (self->game_label)
-		b6_json_unref_value(&self->game_label->up);
-	self->game_label = b6_json_new_string(lang->json, NULL);
-	if ((text = b6_json_get_object_as(lang, "game", string))) {
-		self->game_label->impl->ops->append(self->game_label->impl,
-						    self->game_label->json->impl,
-						    b6_json_string_utf8(text),
-						    b6_json_string_size(text));
-	}
-	self->game_label->impl->ops->append(
-		self->game_label->impl, self->game_label->json->impl,
-		utf8_data, utf8_size);
-	self->game.utf8_data = b6_json_string_utf8(self->game_label);
-	self->game.utf8_size = b6_json_string_size(self->game_label);
-	setup_menu_entry_utf8(&self->mode, lang,
-			      up->engine->game_config->entry.name,
-			      up->engine->game_config->entry.size);
+	b6_clear_utf8_string(&self->game_label);
+	if ((text = b6_json_get_object_as(lang, B6_UTF8("game"), string)))
+		b6_extend_utf8_string(&self->game_label,
+				      b6_json_get_string(text));
+	b6_extend_utf8_string(&self->game_label,
+			      up->engine->layout_provider->entry.id);
+	set_pref_game(up->engine->pref, up->engine->layout_provider->entry.id);
+	b6_clone_utf8(&self->game.utf8, &self->game_label.utf8);
+	setup_menu_entry(&self->mode, lang, up->engine->game_config->entry.id);
 	setup_menu_entry(&self->shuffle, lang,
 			 get_pref_shuffle(up->engine->pref) ?
-			 "shuffle_on" : "shuffle_off");
-	setup_menu_entry(&self->back, lang, "back");
+			 B6_UTF8("shuffle_on") :
+			 B6_UTF8("shuffle_off"));
+	setup_menu_entry(&self->back, lang, B6_UTF8("back"));
 }
 
 static struct submenu *select_game_options(struct submenu *up,
@@ -310,8 +285,7 @@ static struct submenu *select_game_options(struct submenu *up,
 		up->engine->game_config =
 			get_next_game_config(up->engine->game_config);
 		set_pref_mode(up->engine->pref,
-			      up->engine->game_config->entry.name,
-			      up->engine->game_config->entry.size);
+			      up->engine->game_config->entry.id);
 	} else if (entry == &self->shuffle)
 		set_pref_shuffle(up->engine->pref,
 				 !get_pref_shuffle(up->engine->pref));
@@ -322,8 +296,7 @@ static void leave_game_options(struct submenu *up)
 {
 	struct game_options_menu *self =
 		b6_cast_of(up, struct game_options_menu, up);
-	if (self->game_label)
-		b6_json_unref_value(&self->game_label->up);
+	b6_finalize_utf8_string(&self->game_label);
 }
 
 static void enter_video_options(struct submenu *up,
@@ -346,12 +319,14 @@ static void update_video_options(struct submenu *up,
 {
 	struct video_options_menu *self =
 		b6_cast_of(up, struct video_options_menu, up);
-	setup_menu_entry(&self->fullscreen, lang,
-			 self->fs ?  "fullscreen_on" : "fullscreen_off");
-	setup_menu_entry(&self->vsync, lang,
-			 self->vs ?  "vsync_on" : "vsync_off");
-	setup_menu_entry(&self->apply, lang, "apply");
-	setup_menu_entry(&self->back, lang, "back");
+	setup_menu_entry(&self->fullscreen, lang, self->fs ?
+			 B6_UTF8("fullscreen_on") :
+			 B6_UTF8("fullscreen_off"));
+	setup_menu_entry(&self->vsync, lang, self->vs ?
+			 B6_UTF8("vsync_on") :
+			 B6_UTF8("vsync_off"));
+	setup_menu_entry(&self->apply, lang, B6_UTF8("apply"));
+	setup_menu_entry(&self->back, lang, B6_UTF8("back"));
 }
 
 static struct submenu *select_video_options(struct submenu *up,
@@ -459,8 +434,21 @@ static int menu_phase_init(struct phase *up, const struct phase *prev)
 	int retval;
 	struct b6_json_object *lang;
 	lang = b6_json_value_as(get_engine_language(up->engine)->value, object);
-	if (!(self->lang = b6_json_get_object_as(lang, "menu", object))) {
+	self->lang = b6_json_get_object_as(lang, B6_UTF8("menu"), object);
+	if (!self->lang) {
 		log_e("cannot find menu json object");
+		return -1;
+	}
+	if (!(self->game_phase = lookup_phase(B6_UTF8("game")))) {
+		log_e("cannot find \"game\" phase");
+		return -1;
+	}
+	if (!(self->hof_phase = lookup_phase(B6_UTF8("hall_of_fame")))) {
+		log_e("cannot find \"hall_of_fame\" phase");
+		return -1;
+	}
+	if (!(self->credits_phase = lookup_phase(B6_UTF8("credits")))) {
+		log_e("cannot find \"credits\" phase");
 		return -1;
 	}
 	self->next = up;
@@ -508,6 +496,6 @@ static int menu_phase_ctor(void)
 		.exec = menu_phase_exec,
 	};
 	static struct menu_phase menu_phase;
-	return register_phase(&menu_phase.up, "menu", &ops);
+	return register_phase(&menu_phase.up, B6_UTF8("menu"), &ops);
 }
 register_init(menu_phase_ctor);

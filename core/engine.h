@@ -101,11 +101,11 @@ extern void run_engine(struct engine*);
 
 extern struct b6_registry __phase_registry;
 
-static inline int register_phase(struct phase *self, const char *name,
+static inline int register_phase(struct phase *self, const struct b6_utf8 *id,
 				 const struct phase_ops *ops)
 {
 	self->ops = ops;
-	return b6_register(&__phase_registry, &self->entry, name);
+	return b6_register(&__phase_registry, &self->entry, id);
 }
 
 static inline void unregister_phase(struct phase *self)
@@ -113,9 +113,9 @@ static inline void unregister_phase(struct phase *self)
 	return b6_unregister(&__phase_registry, &self->entry);
 }
 
-static inline struct phase *lookup_phase(const char *name)
+static inline struct phase *lookup_phase(const struct b6_utf8 *id)
 {
-	struct b6_entry *entry = b6_lookup_registry(&__phase_registry, name);
+	struct b6_entry *entry = b6_lookup_registry(&__phase_registry, id);
 	return entry ? b6_cast_of(entry, struct phase, entry) : NULL;
 }
 

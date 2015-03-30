@@ -26,6 +26,7 @@
 static void write_head(struct ostream *ostream)
 {
 	static const char a[] =
+		"#include <b6/utf8.h>\n"
 		"#include \"lib/embedded.h\"\n"
 		"static const unsigned char data[] = {\n";
 	write_ostream(ostream, a, sizeof(a) - 1);
@@ -51,8 +52,8 @@ static ssize_t write_body(struct istream *is, struct ostream *os,
 static void write_foot(struct ostream *ostream, char *name, size_t size)
 {
 	static const char a[] = "};\npublish_embedded(data, ";
-	static const char b[] = ", \"";
-	static const char c[] = "\");\n";
+	static const char b[] = ", B6_UTF8(\"";
+	static const char c[] = "\"));\n";
 	char s[16];
 	int n;
 	write_ostream(ostream, a, sizeof(a) - 1);

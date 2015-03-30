@@ -67,7 +67,7 @@ extern int parse_layout(struct layout *l, struct istream *s);
 struct layout_provider {
 	struct b6_entry entry;
 	const struct layout_provider_ops *ops;
-	const char *name;
+	const char *id;
 	unsigned int size;
 };
 
@@ -76,9 +76,9 @@ extern struct b6_registry __layout_provider_registry;
 extern struct layout_provider *get_default_layout_provider(void);
 
 static inline int register_layout_provider(struct layout_provider *self,
-					   const char *name)
+					   const struct b6_utf8 *id)
 {
-	return b6_register(&__layout_provider_registry, &self->entry, name);
+	return b6_register(&__layout_provider_registry, &self->entry, id);
 }
 
 static inline void unregister_layout_provider(struct layout_provider *self)
@@ -86,12 +86,11 @@ static inline void unregister_layout_provider(struct layout_provider *self)
 	b6_unregister(&__layout_provider_registry, &self->entry);
 }
 
-static inline struct layout_provider *lookup_layout_provider(const void *utf8,
-							     unsigned int size)
+static inline struct layout_provider *lookup_layout_provider(
+	const struct b6_utf8 *id)
 {
 	struct b6_entry *e =
-		b6_lookup_registry_utf8(&__layout_provider_registry,
-					utf8, size);
+		b6_lookup_registry(&__layout_provider_registry, id);
 	return e ? b6_cast_of(e, struct layout_provider, entry) : NULL;
 }
 
@@ -109,15 +108,6 @@ struct layout_provider_ops {
 	int (*get)(struct layout_provider*, unsigned int, struct layout*);
 };
 
-static inline void reset_layout_provider(struct layout_provider *self,
-					 const struct layout_provider_ops *ops,
-					 const char *name, unsigned int size)
-{
-	self->ops = ops;
-	self->name = name;
-	self->size = size;
-}
-
 static inline int get_layout_from_provider(struct layout_provider *self,
 					   unsigned int n,
 					   struct layout *layout)
@@ -130,7 +120,7 @@ struct data_layout_provider {
 };
 
 extern int reset_data_layout_provider(struct data_layout_provider *self,
-				      const char *name);
+				      const char *id);
 
 struct layout_shuffler {
 	struct layout_provider up;

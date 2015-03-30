@@ -22,11 +22,11 @@
 
 #include <b6/list.h>
 #include <b6/observer.h>
+#include <b6/utf8.h>
 
 struct menu_entry {
 	struct b6_dref dref;
-	const void *utf8_data;
-	unsigned int utf8_size;
+	struct b6_utf8 utf8;
 	void *cookie;
 };
 

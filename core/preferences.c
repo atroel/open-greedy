@@ -24,6 +24,7 @@
 
 #include "lib/io.h"
 #include "lib/log.h"
+#include "lib/std.h"
 
 #include "env.h"
 #include "json.h"
@@ -43,213 +44,209 @@
 int initialize_pref(struct preferences *self, struct b6_json *json,
 		    const char *path)
 {
-	char *ptr = self->path;
-	unsigned int len = b6_card_of(self->path);
-	const char *src = get_rw_dir();
-	while (*src) {
-		if (!len--)
-			return -2;
-		*ptr++ = *src++;
+	struct b6_utf8 utf8[2];
+	b6_utf8_from_ascii(&utf8[0], get_rw_dir());
+	b6_utf8_from_ascii(&utf8[1], path);
+	b6_initialize_utf8_string(&self->path, &b6_std_allocator);
+	if (b6_extend_utf8_string(&self->path, &utf8[0]) ||
+	    b6_append_utf8_string(&self->path, '/') ||
+	    b6_extend_utf8_string(&self->path, &utf8[1])) {
+		log_e("cannot compose path");
+		b6_finalize_utf8_string(&self->path);
+		return -1;
 	}
-	if (!len)
-		return -2;
-	*ptr++ = '/';
-	len -= 1;
-	do
-		if (!len--)
-			return -2;
-	while ((*ptr++ = *path++));
-	self->root = b6_json_new_object(json);
-	return -!self->root;
+	if (!(self->root = b6_json_new_object(json))) {
+		log_e("cannot create json object");
+		b6_finalize_utf8_string(&self->path);
+		return -1;
+	}
+	return 0;
 }
 
 void finalize_pref(struct preferences *self)
 {
+	b6_finalize_utf8_string(&self->path);
 	b6_json_unref_value(&self->root->up);
 }
 
 static int get_pref_bool(struct preferences *self, int default_value,
-			 const void **path_utf8, unsigned int *path_size,
-			 unsigned int npaths, const char *id)
+			 const struct b6_utf8 *paths, unsigned int npaths,
+			 const char *id)
 {
 	struct b6_json_object *pref;
 	struct b6_json_value *value;
-	if (!(pref = walk_json(self->root, path_utf8, path_size, npaths, 0)) ||
-	    !(value = b6_json_get_object(pref, id)))
+	struct b6_utf8 utf8;
+	if (!(pref = walk_json(self->root, paths, npaths, 0)) ||
+	    !(value = b6_json_get_object(pref, b6_utf8_from_ascii(&utf8, id))))
 		return default_value;
 	return !b6_json_value_is_of(value, false);
 }
 
 static void set_pref_bool(struct preferences *self, int value,
-			  const void **path_utf8, unsigned int *path_size,
+			  const struct b6_utf8 *paths,
 			  unsigned int npaths, const char *id)
 {
 	struct b6_json_object *pref;
-	if ((pref = walk_json(self->root, path_utf8, path_size, npaths, 1)))
-		b6_json_set_object(pref, id, value ?
+	struct b6_utf8 utf8;
+	if ((pref = walk_json(self->root, paths, npaths, 1)))
+		b6_json_set_object(pref, b6_utf8_from_ascii(&utf8, id), value ?
 				   &pref->json->json_true.up :
 				   &pref->json->json_false.up);
 }
 
-static const void *get_pref_string(struct preferences *self, unsigned int *size,
-				   const void **path_utf8,
-				   unsigned int *path_size,
-				   unsigned int npaths,
-				   const char *id)
+static const struct b6_utf8 *get_pref_string(struct preferences *self,
+					     const struct b6_utf8 *paths,
+					     unsigned int npaths,
+					     const char *id)
 {
 	struct b6_json_object *pref;
 	struct b6_json_string *str;
-	if (!(pref = walk_json(self->root, path_utf8, path_size, npaths, 0)) ||
-	    !(str = b6_json_get_object_as(pref, id, string)))
+	struct b6_utf8 utf8;
+	b6_utf8_from_ascii(&utf8, id);
+	if (!(pref = walk_json(self->root, paths, npaths, 0)) ||
+	    !(str = b6_json_get_object_as(pref, &utf8, string)))
 		return NULL;
-	*size = b6_json_string_size(str);
-	return b6_json_string_utf8(str);
+	return b6_json_get_string(str);
 }
 
 static void set_pref_string(struct preferences *self,
-			    const void *utf8, unsigned int size,
-			    const void **path_utf8, unsigned int *path_size,
-			    unsigned int npaths, const char *id)
+			    const struct b6_utf8 *utf8,
+			    const struct b6_utf8 *paths, unsigned int npaths,
+			    const char *id)
 {
 	struct b6_json_object *pref;
 	struct b6_json_string *str;
 	enum b6_json_error error;
-	if (!(pref = walk_json(self->root, path_utf8, path_size, npaths, 1)))
+	struct b6_utf8 id_utf8;
+	if (!(pref = walk_json(self->root, paths, npaths, 1)))
 		return;
-	if ((str = b6_json_get_object_as(pref, id, string)))
-		b6_json_set_string(str, utf8, size);
-	else if (!(str = b6_json_new_string(pref->json, NULL)))
+	b6_utf8_from_ascii(&id_utf8, id);
+	if ((str = b6_json_get_object_as(pref, &id_utf8, string)))
+		b6_json_set_string(str, utf8);
+	else if (!(str = b6_json_new_string(pref->json, utf8)))
 		log_e("cannot allocate %s", id);
-	else if (b6_json_set_string(str, utf8, size)) {
-		log_e("cannot assign %s", id);
-		b6_json_unref_value(&str->up);
-	} else if ((error = b6_json_set_object(pref, id, &str->up))) {
+	else if ((error = b6_json_set_object(pref, &id_utf8, &str->up))) {
 		log_e("cannot set %s (%s)", id, b6_json_strerror(error));
 		b6_json_unref_value(&str->up);
 	}
 }
 
-static const void *video_path[] = { PREF_VIDEO_OPTIONS };
-static unsigned int video_size[] = { sizeof(PREF_VIDEO_OPTIONS) - 1 };
+static const struct b6_utf8 video_path[] = {
+	B6_DEFINE_UTF8(PREF_VIDEO_OPTIONS),
+};
 
 int get_pref_fullscreen(struct preferences *self)
 {
-	return get_pref_bool(self, 0, video_path, video_size,
-			     b6_card_of(video_path), PREF_FULLSCREEN);
+	return get_pref_bool(self, 0, video_path, b6_card_of(video_path),
+			     PREF_FULLSCREEN);
 }
 
 void set_pref_fullscreen(struct preferences *self, int value)
 {
-	set_pref_bool(self, value, video_path, video_size,
-		      b6_card_of(video_path), PREF_FULLSCREEN);
+	set_pref_bool(self, value, video_path, b6_card_of(video_path),
+		      PREF_FULLSCREEN);
 }
 
 int get_pref_vsync(struct preferences *self)
 {
-	return get_pref_bool(self, 1, video_path, video_size,
-			     b6_card_of(video_path), PREF_VSYNC);
+	return get_pref_bool(self, 1, video_path, b6_card_of(video_path),
+			     PREF_VSYNC);
 }
 
 void set_pref_vsync(struct preferences *self, int value)
 {
-	set_pref_bool(self, value, video_path, video_size,
-		      b6_card_of(video_path), PREF_VSYNC);
+	set_pref_bool(self, value, video_path, b6_card_of(video_path),
+		      PREF_VSYNC);
 }
 
-static const void *game_path[] = { PREF_GAME_OPTIONS };
-static unsigned int game_size[] = { sizeof(PREF_GAME_OPTIONS) - 1 };
+static const struct b6_utf8 game_path[] = { B6_DEFINE_UTF8(PREF_GAME_OPTIONS) };
 
 int get_pref_shuffle(struct preferences *self)
 {
-	return get_pref_bool(self, 0, game_path, game_size,
-			     b6_card_of(game_path), PREF_SHUFFLE);
+	return get_pref_bool(self, 0, game_path, b6_card_of(game_path),
+			     PREF_SHUFFLE);
 }
 
 void set_pref_shuffle(struct preferences *self, int value)
 {
-	set_pref_bool(self, value, game_path, game_size, b6_card_of(game_path),
+	set_pref_bool(self, value, game_path, b6_card_of(game_path),
 		      PREF_SHUFFLE);
 }
 
-const void *get_pref_game(struct preferences *self, unsigned int *size)
+const struct b6_utf8 *get_pref_game(struct preferences *self)
 {
-	return get_pref_string(self, size, game_path, game_size,
-			       b6_card_of(game_path), PREF_GAME);
+	return get_pref_string(self, game_path, b6_card_of(game_path),
+			       PREF_GAME);
 }
 
-void set_pref_game(struct preferences *self, const void *utf8,
-		   unsigned int size)
+void set_pref_game(struct preferences *self, const struct b6_utf8 *utf8)
 {
-	set_pref_string(self, utf8, size, game_path, game_size,
-			b6_card_of(game_path), PREF_GAME);
+	set_pref_string(self, utf8, game_path, b6_card_of(game_path),
+			PREF_GAME);
 }
 
-const void *get_pref_mode(struct preferences *self, unsigned int *size)
+const struct b6_utf8 *get_pref_mode(struct preferences *self)
 {
-	return get_pref_string(self, size, game_path, game_size,
-			       b6_card_of(game_path), PREF_MODE);
+	return get_pref_string(self, game_path, b6_card_of(game_path),
+			       PREF_MODE);
 }
 
-void set_pref_mode(struct preferences *self, const void *utf8,
-		   unsigned int size)
+void set_pref_mode(struct preferences *self, const struct b6_utf8 *utf8)
 {
-	set_pref_string(self, utf8, size, game_path, game_size,
-			b6_card_of(game_path), PREF_MODE);
+	set_pref_string(self, utf8, game_path, b6_card_of(game_path),
+			PREF_MODE);
 }
 
-static const void *ui_path[] = { PREF_UI_OPTIONS };
-static unsigned int ui_size[] = { sizeof(PREF_UI_OPTIONS) - 1 };
+static const struct b6_utf8 ui_path[] = { B6_DEFINE_UTF8(PREF_UI_OPTIONS) };
 
-const void *get_pref_lang(struct preferences *self, unsigned int *size)
+const struct b6_utf8 *get_pref_lang(struct preferences *self)
 {
-	return get_pref_string(self, size, ui_path, ui_size,
-			       b6_card_of(ui_path), PREF_LANG);
+	return get_pref_string(self, ui_path, b6_card_of(ui_path), PREF_LANG);
 }
 
-void set_pref_lang(struct preferences *self, const void *utf8,
-		   unsigned int size)
+void set_pref_lang(struct preferences *self, const struct b6_utf8 *utf8)
 {
-	set_pref_string(self, utf8, size, ui_path, ui_size, b6_card_of(ui_path),
-			PREF_LANG);
+	set_pref_string(self, utf8, ui_path, b6_card_of(ui_path), PREF_LANG);
 }
+
+static const struct b6_utf8 level_utf8 = B6_DEFINE_UTF8(PREF_LEVEL);
 
 void set_pref_level(struct preferences *self, unsigned int level,
-		    const void *game_utf8, unsigned int game_size,
-		    const void *mode_utf8, unsigned int mode_size)
+		    const struct b6_utf8 *game, const struct b6_utf8 *mode)
 {
-	const void *path_utf8[] = { PREF_ACHIEVEMENTS, game_utf8, mode_utf8 };
-	unsigned int path_size[] = {
-		sizeof(PREF_ACHIEVEMENTS) - 1, game_size, mode_size
+	const struct b6_utf8 path[] = {
+		B6_DEFINE_UTF8(PREF_ACHIEVEMENTS),
+		B6_CLONE_UTF8(game),
+		B6_CLONE_UTF8(mode),
 	};
 	struct b6_json_object *pref;
 	struct b6_json_number *number;
 	enum b6_json_error error;
-	if (!(pref = walk_json(self->root, path_utf8, path_size,
-			       b6_card_of(path_utf8), 1)))
+	if (!(pref = walk_json(self->root, path, b6_card_of(path), 1)))
 		return;
 	if (!(number = b6_json_new_number(self->root->json, level))) {
 		log_e("cannot allocate number");
 		return;
 	}
-	if ((error = b6_json_set_object(pref, PREF_LEVEL, &number->up))) {
+	if ((error = b6_json_set_object(pref, &level_utf8, &number->up))) {
 		log_e("cannot set number (%s)", b6_json_strerror(error));
 		b6_json_unref_value(&number->up);
 	}
 }
 
 unsigned int get_pref_level(const struct preferences *self,
-			    const void *game_utf8, unsigned int game_size,
-			    const void *mode_utf8, unsigned int mode_size)
+			    const struct b6_utf8 *game,
+			    const struct b6_utf8 *mode)
 {
-	const void *path_utf8[] = { PREF_ACHIEVEMENTS, game_utf8, mode_utf8 };
-	unsigned int path_size[] = {
-		sizeof(PREF_ACHIEVEMENTS) - 1, game_size, mode_size
+	const struct b6_utf8 path[] = {
+		B6_DEFINE_UTF8(PREF_ACHIEVEMENTS),
+		B6_CLONE_UTF8(game),
+		B6_CLONE_UTF8(mode),
 	};
 	struct b6_json_object *pref;
 	struct b6_json_number *number;
-	if (!(pref = walk_json(self->root, path_utf8, path_size,
-			       b6_card_of(path_utf8), 0)) ||
-	    !(number = b6_json_get_object_as(pref, PREF_LEVEL, number)))
+	if (!(pref = walk_json(self->root, path, b6_card_of(path), 0)) ||
+	    !(number = b6_json_get_object_as(pref, &level_utf8, number)))
 		return 0;
 	return b6_json_get_number(number);
 }
@@ -262,7 +259,7 @@ int load_pref(struct preferences *self)
 	struct json_istream js;
 	struct b6_json_parser_info info;
 	enum b6_json_error error;
-	if (initialize_ifstream(&fs, self->path)) {
+	if (initialize_ifstream(&fs, (char*)self->path.utf8.ptr)) {
 		log_e("cannot create file stream");
 		return -1;
 	}
@@ -287,7 +284,7 @@ int save_pref(struct preferences *self)
 	struct json_ostream js;
 	struct b6_json_default_serializer serializer;
 	enum b6_json_error error;
-	initialize_ofstream(&fs, self->path);
+	initialize_ofstream(&fs, self->path.utf8.ptr);
 	if (initialize_ozstream(&zs, &fs.ostream, buf, sizeof(buf))) {
 		finalize_ofstream(&fs);
 		log_e("cannot create compression stream");

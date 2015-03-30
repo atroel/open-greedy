@@ -24,7 +24,7 @@
 #undef BUILDING_STATIC
 #include <b6/clock.h>
 #include <b6/cmdline.h>
-#include <string.h>
+#include <b6/utf8.h>
 
 #include "core/console.h"
 #include "core/controller.h"
@@ -49,6 +49,9 @@ b6_flag(sdl_sleep, uint);
 static Uint32 flags = SDL_WINDOW_RESIZABLE;
 
 static int sdl_count = 0;
+
+static const struct b6_utf8 sdl_utf8 = B6_DEFINE_UTF8("sdl");
+static const struct b6_utf8 sdl_gl_utf8 = B6_DEFINE_UTF8("sdl/gl");
 
 static void finalize_sdl()
 {
@@ -527,7 +530,7 @@ static int sdl_console_register(void)
 		.close = sdl_console_close,
 	};
 	static struct sdl_console instance = { .up = { .ops = &ops, }, };
-	return register_console(&instance.up, "sdl");
+	return register_console(&instance.up, &sdl_utf8);
 }
 register_init(sdl_console_register);
 
@@ -606,7 +609,7 @@ static int sdl_gl_console_register(void)
 		.close = sdl_gl_console_close,
 	};
 	static struct sdl_gl_console instance = { .up = { .ops = &ops, }, };
-	return register_console(&instance.up, "sdl/gl");
+	return register_console(&instance.up, &sdl_gl_utf8);
 }
 register_init(sdl_gl_console_register);
 
@@ -894,7 +897,7 @@ static int sdl_mixer_register(void)
 		.set_music_pos = sdl_mixer_set_music_pos,
 	};
 	setup_mixer(&sdl_mixer.mixer, &ops);
-	return register_mixer(&sdl_mixer.mixer, "sdl");
+	return register_mixer(&sdl_mixer.mixer, &sdl_utf8);
 }
 register_init(sdl_mixer_register);
 
@@ -933,7 +936,7 @@ void register_sdl_clock_source(void)
 	};
 	static struct b6_clock sdl_clock = { .ops = &sdl_clock_ops, };
 	static struct b6_named_clock sdl_named_clock = { .clock = &sdl_clock, };
-	b6_register_named_clock(&sdl_named_clock, "sdl");
+	b6_register_named_clock(&sdl_named_clock, &sdl_utf8);
 }
 
 const char *get_platform_rw_dir(void)

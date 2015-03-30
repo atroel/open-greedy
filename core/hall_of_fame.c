@@ -23,6 +23,7 @@
 #include "lib/log.h"
 #include "lib/std.h"
 #include <b6/registry.h>
+#include <b6/utf8.h>
 
 B6_REGISTRY_DEFINE(hall_of_fame_registry);
 
@@ -147,32 +148,45 @@ fail_zstream:
 }
 
 struct hall_of_fame *load_hall_of_fame(const char *levels_name,
-				       const char *config_name)
+				       const struct b6_utf8 *config_name)
 {
+	struct b6_utf8_string name;
 	struct ifstream ifs;
 	struct b6_entry *entry;
 	struct hall_of_fame *self;
-	char name[sizeof(self->name)];
-	int len, retval, i;
-	len =  snprintf(name, sizeof(name), "%s/%s.%s.hof", get_rw_dir(),
-			levels_name, config_name);
-	if (len >= sizeof(name))
-		return NULL;
-	entry = b6_lookup_registry(&hall_of_fame_registry, name);
-	if (entry)
-		return b6_cast_of(entry, struct hall_of_fame, entry);
-	log_i("%s not in cache.", name);
-	if (!(self = b6_allocate(&b6_std_allocator, sizeof(*self)))) {
-		log_e("out of memory for %s", name);
+	struct b6_utf8 utf8[2];
+	int retval, i;
+	b6_initialize_utf8_string(&name, &b6_std_allocator);
+	b6_utf8_from_ascii(&utf8[0], get_rw_dir());
+	b6_utf8_from_ascii(&utf8[1], levels_name);
+	if (b6_extend_utf8_string(&name, &utf8[0]) ||
+	    b6_append_utf8_string(&name, '/') ||
+	    b6_extend_utf8_string(&name, &utf8[1]) ||
+	    b6_append_utf8_string(&name, '.') ||
+	    b6_extend_utf8_string(&name, config_name) ||
+	    b6_append_utf8_string(&name, '.') ||
+	    b6_append_utf8_string(&name, 'h') ||
+	    b6_append_utf8_string(&name, 'o') ||
+	    b6_append_utf8_string(&name, 'f')) {
+		log_e("out of memory");
+		b6_finalize_utf8_string(&name);
 		return NULL;
 	}
-	for (i = 0; i < sizeof(name); i += 1)
-		if (!(self->name[i] = name[i]))
-			break;
+	if ((entry = b6_lookup_registry(&hall_of_fame_registry, &name.utf8))) {
+		b6_finalize_utf8_string(&name);
+		return b6_cast_of(entry, struct hall_of_fame, entry);
+	}
+	log_i("%s not in cache.", name.utf8.ptr);
+	if (!(self = b6_allocate(&b6_std_allocator, sizeof(*self)))) {
+		log_e("out of memory for %s", name.utf8.ptr);
+		b6_finalize_utf8_string(&name);
+		return NULL;
+	}
+	b6_swap_utf8_string(&self->name, &name);
 	b6_list_initialize(&self->list);
 	for (i = 0; i < b6_card_of(self->entries); i += 1)
 		b6_list_add_last(&self->list, &self->entries[i].dref);
-	if (initialize_ifstream(&ifs, name) ||
+	if (initialize_ifstream(&ifs, self->name.utf8.ptr) ||
 	    read_hall_of_fame(self, &ifs.istream)) {
 		for (i = 0; i < b6_card_of(self->entries); i += 1) {
 			struct hall_of_fame_entry *entry = &self->entries[i];
@@ -180,13 +194,16 @@ struct hall_of_fame *load_hall_of_fame(const char *levels_name,
 			entry->score = 0UL;
 			entry->level = 0UL;
 		}
-		log_w("created %s", name);
+		log_w("created %s", self->name.utf8.ptr);
 	} else
-		log_i("loaded %s", name);
-	retval = b6_register(&hall_of_fame_registry, &self->entry, self->name);
+		log_w("loaded %s", self->name.utf8.ptr);
+	retval = b6_register(&hall_of_fame_registry, &self->entry,
+			     &self->name.utf8);
 	if (retval) {
+		log_e("could not register %s (%d)", self->name.utf8.ptr,
+		      retval);
+		b6_finalize_utf8_string(&self->name);
 		b6_deallocate(&b6_std_allocator, self);
-		log_e("could not register %s (%d)", name, retval);
 		self = NULL;
 	}
 	return self;
@@ -196,7 +213,7 @@ int save_hall_of_fame(struct hall_of_fame *self)
 {
 	struct ofstream ofs;
 	int retval;
-	if (!(retval = initialize_ofstream(&ofs, self->name))) {
+	if (!(retval = initialize_ofstream(&ofs, self->name.utf8.ptr))) {
 		retval = write_hall_of_fame(self, &ofs.ostream);
 		finalize_ofstream(&ofs);
 	}

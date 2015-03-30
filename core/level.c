@@ -361,48 +361,54 @@ struct item *set_level_place_item(struct level *self, struct place *place,
 	return old_item;
 }
 
-static struct data_entry *lookup_data_layout(const char *name, unsigned int n)
+static struct data_entry *lookup_data_layout(const char *id, unsigned int n)
 {
 	char level[] = "00";
 	level[0] += n / 10;
 	level[1] += n % 10;
-	return n > 99 ? NULL : lookup_data(name, level_data_type, level);
+	return n > 99 ? NULL : lookup_data(id, level_data_type, level);
 }
 
 static int data_layout_provider_get(struct layout_provider *up, unsigned int n,
 				    struct layout *layout)
 {
-	struct data_layout_provider *self =
-		b6_cast_of(up, struct data_layout_provider, up);
 	struct data_entry *entry;
 	struct istream *istream;
 	int retval;
-	if (!(entry = lookup_data_layout(self->up.name, n))) {
-		log_w("could not find %s level #%d", up->name, n);
+	if (!(entry = lookup_data_layout(up->id, n))) {
+		log_w("could not find %s level #%d", up->id, n);
 		return -1;
 	}
 	if (!(istream = get_data(entry))) {
-		log_w("out of memory when reading %s level #%d", up->name, n);
+		log_w("out of memory when reading %s level #%d", up->id, n);
 		return -1;
 	}
 	if ((retval = unserialize_layout(layout, istream)))
-		log_w("error %d when reading %s level #%d", up->name, retval,
-		      n);
+		log_w("error %d when reading %s level #%d", up->id, retval, n);
 	put_data(entry, istream);
 	return retval;
 }
 
+static void reset_layout_provider(struct layout_provider *self,
+				  const struct layout_provider_ops *ops,
+				  const char *id, unsigned int size)
+{
+	self->ops = ops;
+	self->id = id;
+	self->size = size;
+}
+
 int reset_data_layout_provider(struct data_layout_provider *self,
-			       const char *name)
+			       const char *id)
 {
 	static const struct layout_provider_ops ops = {
 		.get = data_layout_provider_get,
 	};
 	unsigned int size;
-	for (size = 0; lookup_data_layout(name, size + 1); size += 1);
+	for (size = 0; lookup_data_layout(id, size + 1); size += 1);
 	if (!size)
 		return -1;
-	reset_layout_provider(&self->up, &ops, name, size);
+	reset_layout_provider(&self->up, &ops, id, size);
 	return 0;
 }
 
@@ -422,7 +428,7 @@ void reset_layout_shuffler(struct layout_shuffler *self,
 		.get = layout_shuffler_get,
 	};
 	unsigned int i;
-	reset_layout_provider(&self->up, &ops, layout_provider->name,
+	reset_layout_provider(&self->up, &ops, layout_provider->id,
 			      layout_provider->size);
 	self->layout_provider = layout_provider;
 	for (i = 0; i < layout_provider->size; i += 1)

@@ -19,6 +19,7 @@
 
 #include <time.h>
 #include <unistd.h>
+#include <b6/utf8.h>
 #include <b6/utils.h>
 #include <b6/clock.h>
 
@@ -50,5 +51,5 @@ void register_linux_clock(void)
 	static struct b6_named_clock linux_named_clock = {
 		.clock = &linux_clock,
 	};
-	b6_register_named_clock(&linux_named_clock, "linux");
+	b6_register_named_clock(&linux_named_clock, B6_UTF8("linux"));
 }

@@ -75,6 +75,6 @@ static void register_win32_clock(void)
 	}
 	win32_clock.uperiod = 1e6/(double)li.QuadPart;
 	win32_clock.base = get_win32_ticks();
-	if (b6_register_named_clock(&win32_named_clock, "win32"))
+	if (b6_register_named_clock(&win32_named_clock, B6_UTF8("win32")))
 		log_e("Could not register win32 clock.");
 }

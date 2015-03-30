@@ -75,12 +75,13 @@ static void setup_label(int n, struct toolkit_label *label,
 	int i;
 	const char *c;
 	char text[] = "00 000 00000000 1234567890ABCDEF";
+	struct b6_utf8 utf8;
 	u32_to_str(&text[0], n + 1, 2);
 	u32_to_str(&text[3], level, 3);
 	u32_to_str(&text[7], score, 8);
 	for (i = 0, c = name; i < 16; i += 1)
 		text[16 + i] = *c ? *c++ : ' ';
-	set_toolkit_label(label, text);
+	set_toolkit_label(label, b6_utf8_from_ascii(&utf8, text));
 }
 
 static void quit_phase(struct hall_of_fame_phase *self)
@@ -181,11 +182,11 @@ static int hall_of_fame_phase_init(struct phase *up, const struct phase *prev)
 				      user);
 	}
 	self->hall_of_fame =
-		load_hall_of_fame(up->engine->layout_provider->name,
-				  up->engine->game_config->entry.name);
+		load_hall_of_fame(up->engine->layout_provider->id,
+				  up->engine->game_config->entry.id);
 	self->entry = NULL;
 	self->quit = 0;
-	if (prev == lookup_phase("game")) {
+	if (prev == lookup_phase(B6_UTF8("game"))) {
 		struct game_result game_result;
 		get_last_game_result(up->engine, &game_result);
 		self->entry = get_hall_of_fame_entry(self->hall_of_fame,
@@ -247,7 +248,7 @@ static int hall_of_fame_phase_init(struct phase *up, const struct phase *prev)
 					 &self->font, 16, 16,
 					 self->cursor_base, 1, 1, 16, 16);
 		enable_toolkit_label_shadow(&self->cursor_label);
-		set_toolkit_label(&self->cursor_label, "#");
+		set_toolkit_label(&self->cursor_label, &b6_utf8_char['#']);
 	} else
 		self->cursor_base = NULL;
 	add_renderer_observer(renderer, setup_renderer_observer(
@@ -320,7 +321,7 @@ static struct phase *hall_of_fame_phase_exec(struct phase *up)
 	struct hall_of_fame_phase *self =
 		b6_cast_of(up, struct hall_of_fame_phase, up);
 	if (self->quit && fade_io_is_stopped(&self->fade_io))
-		return lookup_phase("menu");
+		return lookup_phase(B6_UTF8("menu"));
 	return up;
 }
 
@@ -333,6 +334,7 @@ static int hall_of_fame_phase_ctor(void)
 	};
 	static struct hall_of_fame_phase hall_of_fame_phase;
 	hall_of_fame_phase.name[0] = '\0';
-	return register_phase(&hall_of_fame_phase.up, "hall_of_fame", &ops);
+	return register_phase(&hall_of_fame_phase.up,
+			      B6_UTF8("hall_of_fame"), &ops);
 }
 register_init(hall_of_fame_phase_ctor);

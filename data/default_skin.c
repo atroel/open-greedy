@@ -138,12 +138,13 @@ static const struct image_data_ops default_layout_image_data_ops = {
 #define register_default_image_data(image_id, data_path, x, y, w, h, n, p) \
 do { \
 	static struct default_image_data data; \
-	static const char data_id[] = IMAGE_DATA_ID("default", image_id); \
+	static const struct b6_utf8 data_id = \
+		B6_DEFINE_UTF8(IMAGE_DATA_ID("default", image_id)); \
 	data.path = "private." data_path; \
 	setup_image_data(&data.image_data, &default_image_data_ops, NULL, \
 			 x, y, w, h, n, p); \
-	if ((register_data(&data.data_entry, &default_entry_ops, data_id))) \
-		log_e("cannot register %s", data_id); \
+	if ((register_data(&data.data_entry, &default_entry_ops, &data_id))) \
+		log_e("cannot register default image %s", image_id); \
 } while (0)
 
 #define register_default_single_image_data(image_id, data_path, x, y, w, h) \
@@ -187,11 +188,15 @@ do { \
 
 #define register_embedded_data(path, name) \
 do { \
+	static const struct b6_utf8 utf8[] = { \
+		B6_DEFINE_UTF8(path), \
+		B6_DEFINE_UTF8(name), \
+	}; \
 	static struct buffered_data_entry data; \
 	struct embedded *embedded; \
-	if ((embedded = lookup_embedded(path))) \
+	if ((embedded = lookup_embedded(&utf8[0]))) \
 		register_buffered_data( \
-			&data, embedded->buf, embedded->len, name); \
+			&data, embedded->buf, embedded->len, &utf8[1]); \
 	else \
 		log_e("embedded path not found: %s", path); \
 } while (0)
@@ -202,32 +207,35 @@ do { \
 
 #define register_cached_image(path, name) \
 do { \
+	static const struct b6_utf8 utf8 = B6_DEFINE_UTF8(name); \
 	static struct cached_image_data data; \
 	struct embedded *embedded; \
 	if ((embedded = lookup_embedded(path))) { \
 		register_cached_image_data( \
-			&data, embedded->buf, embedded->len, name); \
+			&data, embedded->buf, embedded->len, &utf8); \
 	} else \
 		log_p("embedded image path not found: %s", path); \
 } while (0)
 
 #define register_external_data(_path, _name) \
 do { \
+	static const struct b6_utf8 utf8 = B6_DEFINE_UTF8(_name); \
 	static struct buffered_data_entry data; \
 	static struct membuf membuf; \
 	initialize_membuf(&membuf, &b6_std_allocator); \
 	if (!load_external_data(&membuf, _path)) \
-		register_buffered_data(&data, membuf.buf, membuf.len, _name); \
+		register_buffered_data(&data, membuf.buf, membuf.len, &utf8); \
 } while (0)
 
 #define register_external_cached_image(_path, _name) \
 do { \
+	static const struct b6_utf8 utf8 = B6_DEFINE_UTF8(_name); \
 	static struct cached_image_data data; \
 	static struct membuf membuf; \
 	initialize_membuf(&membuf, &b6_std_allocator); \
 	if (!load_external_data(&membuf, _path)) \
 		register_cached_image_data( \
-			&data, membuf.buf, membuf.len, _name); \
+			&data, membuf.buf, membuf.len, &utf8); \
 } while (0)
 
 static struct data_layout_provider default_layout_provider;
@@ -264,21 +272,21 @@ static int default_skin_ctor(void)
 	static unsigned short int casino_x[48], casino_y[48];
 	int i, j;
 
-	register_cached_image("default_font.tga", IMAGE_DATA_ID(
+	register_cached_image(B6_UTF8("default_font.tga"), IMAGE_DATA_ID(
 			"default", "private.default_font.tga"));
-	register_cached_image("default_game.tga", IMAGE_DATA_ID(
+	register_cached_image(B6_UTF8("default_game.tga"), IMAGE_DATA_ID(
 			"default", "private.default_game.tga"));
-	register_external_data("default/credits_music.xm.z", AUDIO_DATA_ID(
-			"default", CREDITS_MUSIC_DATA_ID));
+	register_external_data("default/credits_music.xm.z",
+			       AUDIO_DATA_ID("default", CREDITS_MUSIC_DATA_ID));
 
 	initialize_rgba(&layout_rgba, 16 * LEVEL_WIDTH, 16 * LEVEL_HEIGHT);
 	setup_image_data(&layout_data.image_data,
 			 &default_layout_image_data_ops, &layout_rgba,
 			 origin, origin, layout_rgba.w, layout_rgba.h, 1, 1);
 	if ((register_data(&layout_data.data_entry, &default_entry_ops,
-			   IMAGE_DATA_ID("default", GAME_LAYOUT_DATA_ID))))
-		log_e("cannot register "
-		      IMAGE_DATA_ID("default", GAME_LAYOUT_DATA_ID));
+			   B6_UTF8(IMAGE_DATA_ID("default",
+						       GAME_LAYOUT_DATA_ID)))))
+		log_e("cannot register image data " GAME_LAYOUT_DATA_ID);
 
 	register_default_single_image_data(GAME_PANEL_DATA_ID,
 					   "default_game.tga", 0, 0, 640, 80);
@@ -401,9 +409,9 @@ static int default_skin_ctor(void)
 	register_embedded_level("04");
 	register_embedded_level("05");
 	if (reset_data_layout_provider(&default_layout_provider, "default"))
-		log_p("Could initialize default levels.");
+		log_p("could not initialize default levels.");
 	if (register_layout_provider(&default_layout_provider.up,
-				     "Open Greedy"))
+				     B6_UTF8("Open Greedy")))
 		log_p("Could not register levels.");
 
 	return 0;

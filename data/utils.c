@@ -54,11 +54,11 @@ void setup_lru_cache(struct lru_cache *self, void (*dispose)(void*),
 		b6_list_add_last(&self->free, &entries++->dref);
 }
 
-void *get_lru_cache(struct lru_cache *self, const char *name)
+void *get_lru_cache(struct lru_cache *self, const struct b6_utf8 *id)
 {
 	struct lru_cache_entry *lru_cache_entry;
 	struct b6_entry *entry;
-	if (!(entry = b6_lookup_registry(&self->registry, name)))
+	if (!(entry = b6_lookup_registry(&self->registry, id)))
 		return NULL;
 	lru_cache_entry = b6_cast_of(entry, struct lru_cache_entry, entry);
 	if (&lru_cache_entry->dref != b6_list_last(&self->used)) {
@@ -68,11 +68,12 @@ void *get_lru_cache(struct lru_cache *self, const char *name)
 	return lru_cache_entry->userdata;
 }
 
-void put_lru_cache(struct lru_cache *self, const char *name, void *userdata)
+void put_lru_cache(struct lru_cache *self, const struct b6_utf8 *id,
+		   void *userdata)
 {
 	struct lru_cache_entry *cache_entry;
 	struct b6_entry *entry;
-	if ((entry = b6_lookup_registry(&self->registry, name))) {
+	if ((entry = b6_lookup_registry(&self->registry, id))) {
 		cache_entry = b6_cast_of(entry, struct lru_cache_entry, entry);
 		b6_unregister(&self->registry, &cache_entry->entry);
 		self->dispose(cache_entry->userdata);
@@ -113,7 +114,7 @@ static struct istream *get_buffered_data_entry(struct data_entry *up)
 }
 
 int register_buffered_data(struct buffered_data_entry *self, const void *buf,
-			   unsigned int len, const char *name)
+			   unsigned int len, const struct b6_utf8 *id)
 {
 	static const struct data_entry_ops ops = {
 		.get = get_buffered_data_entry,
@@ -121,7 +122,7 @@ int register_buffered_data(struct buffered_data_entry *self, const void *buf,
 	};
 	self->buf = buf;
 	self->len = len;
-	return register_data(&self->up, &ops, name);
+	return register_data(&self->up, &ops, id);
 }
 
 void unregister_buffered_data(struct buffered_data_entry *self)
@@ -179,8 +180,7 @@ static int cached_image_data_ctor(struct image_data *up, void *param)
 					  izbstream_as_istream(&eis));
 	finalize_izbstream(&eis);
 	if (retval) {
-		log_e("inflating %s failed with error %d",
-		      self->buffered_data_entry.up.entry.name, retval);
+		log_e("inflating failed with error %d", retval);
 		return -1;
 	}
 	self->image_data.rgba = &self->shared_rgba.rgba;
@@ -202,7 +202,7 @@ static void cached_image_data_dtor(struct image_data *up)
 
 int register_cached_image_data(struct cached_image_data *self,
 			       const void *buf, unsigned int len,
-			       const char *name)
+			       const struct b6_utf8 *id)
 {
 	const static struct data_entry_ops entry_ops = {
 		.get = get_cached_image_data_entry,
@@ -218,7 +218,7 @@ int register_cached_image_data(struct cached_image_data *self,
 	setup_image_data(&self->image_data, &image_ops, NULL,
 			 &zero, &zero, 0, 0, 1, 0);
 	self->dref.ref[0] = NULL;
-	return register_data(&self->buffered_data_entry.up, &entry_ops, name);
+	return register_data(&self->buffered_data_entry.up, &entry_ops, id);
 }
 
 void unregister_cached_image_data(struct cached_image_data *self)

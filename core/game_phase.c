@@ -67,7 +67,7 @@ static int game_phase_init(struct phase *up, const struct phase *prev)
 		goto fail_game;
 	}
 	lang = b6_json_value_as(get_engine_language(up->engine)->value, object);
-	if (!(lang = b6_json_get_object_as(lang, "game", object))) {
+	if (!(lang = b6_json_get_object_as(lang, B6_UTF8("game"), object))) {
 		log_e("cannot find game text");
 		goto fail_renderer;
 	}
@@ -114,7 +114,7 @@ static struct phase *game_phase_exec(struct phase *up)
 	struct game_phase *self = to_game_phase(up);
 	b6_sync_cached_clock(&self->clock);
 	if (!play_game(&self->game))
-		return lookup_phase("hall_of_fame");
+		return lookup_phase(B6_UTF8("hall_of_fame"));
 	update_game(&self->game);
 	return up;
 }
@@ -128,6 +128,6 @@ static int game_phase_ctor(void)
 		.suspend = game_phase_suspend,
 	};
 	static struct game_phase game_phase;
-	return register_phase(&game_phase.up, "game", &ops);
+	return register_phase(&game_phase.up, B6_UTF8("game"), &ops);
 }
 register_init(game_phase_ctor);
