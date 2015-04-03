@@ -114,9 +114,28 @@ void set_last_game_result(struct engine *self, const struct game_result *result)
 		       self->game_config->entry.id);
 }
 
-int setup_engine(struct engine *self, const struct b6_clock *clock,
-		 struct console *console, struct mixer *mixer,
-		 struct preferences *pref, struct b6_json_object *languages)
+static void backfill_hall_of_fame(struct engine *self)
+{
+	const struct layout_provider *p = get_default_layout_provider();
+	const struct layout_provider *q = p;
+	do {
+		const struct game_config *c = get_default_game_config();
+		const struct game_config *d = c;
+		do {
+			struct b6_json_array *a;
+			if ((a = open_hall_of_fame(&self->hall_of_fame, q->id,
+						   d->entry.id)))
+				close_hall_of_fame(a);
+			do d = get_next_game_config(d); while (!d);
+		} while (c != d);
+		do q = get_next_layout_provider(q); while (!q);
+	} while (p != q);
+}
+
+int initialize_engine(struct engine *self, const struct b6_clock *clock,
+		      struct console *console, struct mixer *mixer,
+		      struct preferences *pref,
+		      struct b6_json_object *languages)
 {
 	static const struct controller_observer_ops ops = {
 		.on_quit = on_quit,
@@ -125,6 +144,14 @@ int setup_engine(struct engine *self, const struct b6_clock *clock,
 	};
 	const struct b6_utf8 *utf8;
 	int retval;
+	retval = initialize_hall_of_fame(&self->hall_of_fame, languages->json,
+					 "hof.json.z");
+	if (retval)
+		return retval;
+	if (load_hall_of_fame(&self->hall_of_fame) == -2) {
+		backfill_hall_of_fame(self);
+		save_hall_of_fame(&self->hall_of_fame);
+	}
 	setup_controller_observer(&self->observer, &ops);
 	self->clock = clock;
 	self->console = console;
@@ -159,6 +186,11 @@ int setup_engine(struct engine *self, const struct b6_clock *clock,
 		self->game_config->entry.id);
 	self->curr = lookup_phase(B6_UTF8("menu"));
 	return 0;
+}
+
+void finalize_engine(struct engine *self)
+{
+	finalize_hall_of_fame(&self->hall_of_fame);
 }
 
 void reset_engine(struct engine *self)

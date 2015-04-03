@@ -25,6 +25,7 @@
 
 #include "core/console.h"
 #include "core/controller.h"
+#include "core/hall_of_fame.h"
 #include "core/level.h"
 
 struct game_result {
@@ -48,6 +49,7 @@ struct engine {
 	struct preferences *pref;
 	struct b6_json_object *languages;
 	struct b6_json_iterator iter;
+	struct hall_of_fame hall_of_fame;
 };
 
 static inline struct controller *get_engine_controller(const struct engine *e)
@@ -90,10 +92,12 @@ struct phase_ops {
 	void (*resume)(struct phase*);
 };
 
-extern int setup_engine(struct engine *self, const struct b6_clock *clock,
-			struct console *console, struct mixer *mixer,
-			struct preferences *pref,
-			struct b6_json_object *languages);
+extern int initialize_engine(struct engine *self, const struct b6_clock *clock,
+			     struct console *console, struct mixer *mixer,
+			     struct preferences *pref,
+			     struct b6_json_object *languages);
+
+extern void finalize_engine(struct engine *self);
 
 extern void reset_engine(struct engine *self);
 

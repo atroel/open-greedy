@@ -20,57 +20,66 @@
 #ifndef HALL_OF_FAME_H
 #define HALL_OF_FAME_H
 
+#include <b6/allocator.h>
+#include <b6/json.h>
 #include <b6/list.h>
 #include <b6/registry.h>
-
-struct hall_of_fame_entry {
-	struct b6_dref dref;
-	char name[16];
-	unsigned int level;
-	unsigned int score;
-};
+#include <b6/utf8.h>
 
 struct hall_of_fame {
-	struct b6_entry entry;
-	struct b6_list list;
-	struct hall_of_fame_entry entries[10];
-	struct b6_utf8_string name;
+	char path_buffer[512];
+	struct b6_fixed_allocator path_allocator;
+	struct b6_utf8_string path;
+	struct b6_json_object *object;
 };
+
+extern int initialize_hall_of_fame(struct hall_of_fame *self,
+				   struct b6_json *json, const char *path);
+
+extern void finalize_hall_of_fame(struct hall_of_fame *self);
+
+extern int load_hall_of_fame(struct hall_of_fame *self);
+
+extern int save_hall_of_fame(const struct hall_of_fame *self);
+
+extern struct b6_json_array *open_hall_of_fame(struct hall_of_fame *self,
+					       const char *levels,
+					       const struct b6_utf8 *config);
+
+extern void close_hall_of_fame(struct b6_json_array *array);
+
+extern struct b6_json_object *amend_hall_of_fame(struct b6_json_array *array,
+						 unsigned long int level,
+						 unsigned long int score);
 
 struct hall_of_fame_iterator {
-	const struct b6_list *list;
-	struct b6_dref *dref;
+	struct b6_json_array *a;
+	unsigned int i;
 };
 
-static inline void setup_hall_of_fame_iterator(
-	const struct hall_of_fame *self, struct hall_of_fame_iterator *iter)
+static inline void reset_hall_of_fame_iterator(
+	struct hall_of_fame_iterator *self, struct b6_json_array *array)
 {
-	iter->list = &self->list;
-	iter->dref = b6_list_first(iter->list);
+	self->a = array;
+	self->i = 0;
 }
 
-static inline struct hall_of_fame_entry *hall_of_fame_iterator_next(
-	struct hall_of_fame_iterator *iter)
-{
-	struct hall_of_fame_entry *entry = NULL;
-	if (iter->dref != b6_list_tail(iter->list)) {
-		entry = b6_cast_of(iter->dref, struct hall_of_fame_entry, dref);
-		iter->dref = b6_list_walk(iter->dref, B6_NEXT);
-	}
-	return entry;
+static inline int hall_of_fame_iterator_has_next(
+	const struct hall_of_fame_iterator *self) {
+	return self->i < b6_json_array_len(self->a);
 }
 
-extern struct hall_of_fame *load_hall_of_fame(
-	const char *levels_name, const struct b6_utf8 *config_name);
+static inline struct b6_json_object *hall_of_fame_iterator_get_next(
+	struct hall_of_fame_iterator *self)
+{
+	return b6_json_get_array_as(self->a, self->i++, object);
+}
 
-extern int save_hall_of_fame(struct hall_of_fame*);
+extern int split_hall_of_fame_entry(struct b6_json_object *object,
+				    unsigned int *level, unsigned int *score,
+				    const struct b6_utf8 **label);
 
-extern struct hall_of_fame_entry *get_hall_of_fame_entry(
-	struct hall_of_fame *self, unsigned long int level,
-	unsigned long int score);
-
-extern void put_hall_of_fame_entry(struct hall_of_fame *self,
-				   struct hall_of_fame_entry *entry,
-				   const char *name);
+extern int alter_hall_of_fame_entry(struct b6_json_object *object,
+				    const struct b6_utf8* label);
 
 #endif /* HALL_OF_FAME_H */

@@ -18,6 +18,12 @@
  */
 
 #include "hall_of_fame_phase.h"
+
+#include <b6/allocator.h>
+#include <b6/clock.h>
+#include <b6/cmdline.h>
+#include <b6/utf8.h>
+
 #include "console.h"
 #include "controller.h"
 #include "data.h"
@@ -29,17 +35,18 @@
 #include "mixer.h"
 #include "renderer.h"
 #include "toolkit.h"
-#include <b6/clock.h>
-#include <b6/cmdline.h>
-#include <stdarg.h>
-#include <stdio.h>
 
 static const char *hof_skin = NULL;
 b6_flag(hof_skin, string);
 
 struct hall_of_fame_phase {
 	struct phase up;
-	struct hall_of_fame *hall_of_fame;
+	struct b6_json_array *array;
+	struct b6_json_object *entry;
+	char buffer[64];
+	struct b6_fixed_allocator fixed_allocator;
+	struct b6_utf8_string name;
+	unsigned long int rank;
 	struct controller_observer controller_observer;
 	short int music;
 	short int quit;
@@ -51,10 +58,6 @@ struct hall_of_fame_phase {
 	struct toolkit_label cursor_label;
 	struct renderer_base *cursor_base;
 	struct fade_io fade_io;
-	struct hall_of_fame_entry *entry;
-	char name[32];
-	unsigned long int size;
-	unsigned long int rank;
 };
 
 static const char *user = NULL;
@@ -68,20 +71,30 @@ static void u32_to_str(char *str, unsigned long int num, int len)
 	}
 }
 
-static void setup_label(int n, struct toolkit_label *label,
-			unsigned long int level, unsigned long int score,
-			const char *name)
+static void setup_label(struct hall_of_fame_phase *self, int n,
+			struct b6_json_object *entry)
 {
-	int i;
-	const char *c;
-	char text[] = "00 000 00000000 1234567890ABCDEF";
+	char text[] = "00 000 00000000 ";
+	unsigned int level, score;
+	const struct b6_utf8 *label;
 	struct b6_utf8 utf8;
+	char buf[64];
+	struct b6_fixed_allocator fixed_allocator;
+	struct b6_utf8_string s;
+	b6_reset_fixed_allocator(&fixed_allocator, buf, sizeof(buf));
+	b6_initialize_utf8_string(&s, &fixed_allocator.allocator);
 	u32_to_str(&text[0], n + 1, 2);
-	u32_to_str(&text[3], level, 3);
-	u32_to_str(&text[7], score, 8);
-	for (i = 0, c = name; i < 16; i += 1)
-		text[16 + i] = *c ? *c++ : ' ';
-	set_toolkit_label(label, b6_utf8_from_ascii(&utf8, text));
+	if (!split_hall_of_fame_entry(entry, &level, &score, &label)) {
+		u32_to_str(&text[3], level, 3);
+		u32_to_str(&text[7], score, 8);
+		b6_setup_utf8(&utf8, text, sizeof(text) - 1);
+		b6_extend_utf8_string(&s, &utf8);
+		b6_extend_utf8_string(&s, label);
+	}
+	while (s.utf8.nchars < 32)
+		b6_append_utf8_string(&s, ' ');
+	set_toolkit_label(&self->label[n], &s.utf8);
+	b6_finalize_utf8_string(&s);
 }
 
 static void quit_phase(struct hall_of_fame_phase *self)
@@ -107,15 +120,15 @@ static void on_key_pressed(struct controller_observer *observer,
 	}
 	if (key != CTRLK_DELETE && key != CTRLK_BACKSPACE)
 		return;
-	if (self->size <= 0)
+	if (b6_utf8_is_empty(&self->name.utf8))
 		return;
-	self->size -= 1;
 	b6_assert(self->cursor_base);
 	move_renderer_base(self->cursor_base, self->cursor_base->x - 16,
 			   self->cursor_base->y);
-	self->name[self->size] = '\0';
-	setup_label(self->rank, &self->label[self->rank],
-		    self->entry->level, self->entry->score, self->name);
+	self->name.utf8.nchars -= 1; // FIXME: add crop API
+	self->name.utf8.nbytes -= 1; // FIXME: add crop API
+	alter_hall_of_fame_entry(self->entry, &self->name.utf8);
+	setup_label(self, self->rank, self->entry);
 }
 
 static void on_text_input(struct controller_observer *observer,
@@ -133,15 +146,14 @@ static void on_text_input(struct controller_observer *observer,
 		return;
 	if (unicode > 127)
 		return;
-	if (self->size >= sizeof(self->entry->name))
+	if (self->name.utf8.nchars >= 16)
 		return;
-	self->name[self->size++] = unicode;
+	b6_append_utf8_string(&self->name, unicode);
 	b6_assert(self->cursor_base);
 	move_renderer_base(self->cursor_base,
 			   self->cursor_base->x + 16, self->cursor_base->y);
-	self->name[self->size] = '\0';
-	setup_label(self->rank, &self->label[self->rank], self->entry->level,
-		    self->entry->score, self->name);
+	alter_hall_of_fame_entry(self->entry, &self->name.utf8);
+	setup_label(self, self->rank, self->entry);
 }
 
 static void on_render(struct renderer_observer *observer)
@@ -175,29 +187,32 @@ static int hall_of_fame_phase_init(struct phase *up, const struct phase *prev)
 	struct istream *is;
 	const char *skin_id = hof_skin ? hof_skin : get_skin_id();
 	int i;
-	if (!*self->name) {
-		if (!user && !(user = get_user_name()))
-			user = "PLAYER";
-		self->size = snprintf(self->name, sizeof(self->name), "%s",
-				      user);
+	self->array = open_hall_of_fame(&up->engine->hall_of_fame,
+					up->engine->layout_provider->id,
+					up->engine->game_config->entry.id);
+	if (!self->array)
+		return -1;
+	if (b6_utf8_is_empty(&self->name.utf8)) {
+		struct b6_utf8 utf8;
+		if (user || (user = get_user_name()))
+			b6_utf8_from_ascii(&utf8, user);
+		else
+			b6_clone_utf8(&utf8, B6_UTF8("PLAYER"));
+		b6_clear_utf8_string(&self->name);
+		b6_extend_utf8_string(&self->name, &utf8);
 	}
-	self->hall_of_fame =
-		load_hall_of_fame(up->engine->layout_provider->id,
-				  up->engine->game_config->entry.id);
 	self->entry = NULL;
 	self->quit = 0;
 	if (prev == lookup_phase(B6_UTF8("game"))) {
 		struct game_result game_result;
 		get_last_game_result(up->engine, &game_result);
-		self->entry = get_hall_of_fame_entry(self->hall_of_fame,
-						     game_result.level + 1,
-						     game_result.score);
+		self->entry = amend_hall_of_fame(self->array,
+						 game_result.level + 1,
+						 game_result.score);
 		if (!self->entry)
 			self->quit = 1;
-		if (self->size > sizeof(self->entry->name)) {
-			self->size = sizeof(self->entry->name);
-			self->name[self->size] = '\0';
-		}
+		else
+			alter_hall_of_fame_entry(self->entry, &self->name.utf8);
 	}
 	root = get_renderer_base(renderer);
 	if (make_font(&self->font, skin_id, HOF_FONT_DATA_ID))
@@ -221,26 +236,21 @@ static int hall_of_fame_phase_init(struct phase *up, const struct phase *prev)
 					 &self->font, u, v, root, x, y, w, h);
 		enable_toolkit_label_shadow(&self->label[i]);
 	}
-	setup_hall_of_fame_iterator(self->hall_of_fame, &iter);
+	reset_hall_of_fame_iterator(&iter, self->array);
 	for (i = 0; i < b6_card_of(self->label); i += 1) {
-		struct hall_of_fame_entry *entry =
-			hall_of_fame_iterator_next(&iter);
-		if (!entry)
+		struct b6_json_object *entry;
+		if (!hall_of_fame_iterator_has_next(&iter))
 			break;
-		if (entry != self->entry) {
-			setup_label(i, &self->label[i], entry->level,
-				    entry->score, entry->name);
-			continue;
-		}
-		self->rank = i;
-		setup_label(i, &self->label[i], entry->level, entry->score,
-			    self->name);
+		entry = hall_of_fame_iterator_get_next(&iter);
+		if (entry == self->entry)
+			self->rank = i;
+		setup_label(self, i, entry);
 	}
 	for (; i < b6_card_of(self->label); i += 1)
 		hide_toolkit_label(&self->label[i]);
 	if (self->entry) {
 		float x = self->label[self->rank].image[0].tile->x +
-			(16 + self->size) * 16;
+			(16 + self->name.utf8.nchars) * 16;
 		float y = self->label[self->rank].image[0].tile->y;
 		self->cursor_base = create_renderer_base_or_die(renderer, root,
 								"cursor", x, y);
@@ -288,9 +298,7 @@ static void hall_of_fame_phase_exit(struct phase *up)
 	int i;
 	finalize_fade_io(&self->fade_io);
 	if (self->entry) {
-		put_hall_of_fame_entry(self->hall_of_fame, self->entry,
-				       self->name);
-		save_hall_of_fame(self->hall_of_fame);
+		save_hall_of_fame(&up->engine->hall_of_fame);
 		self->entry = NULL;
 	}
 	if (self->music) {
@@ -314,6 +322,7 @@ static void hall_of_fame_phase_exit(struct phase *up)
 		destroy_renderer_tile(self->background);
 	}
 	finalize_fixed_font(&self->font);
+	close_hall_of_fame(self->array);
 }
 
 static struct phase *hall_of_fame_phase_exec(struct phase *up)
@@ -332,9 +341,11 @@ static int hall_of_fame_phase_ctor(void)
 		.exit = hall_of_fame_phase_exit,
 		.exec = hall_of_fame_phase_exec,
 	};
-	static struct hall_of_fame_phase hall_of_fame_phase;
-	hall_of_fame_phase.name[0] = '\0';
-	return register_phase(&hall_of_fame_phase.up,
-			      B6_UTF8("hall_of_fame"), &ops);
+	static struct hall_of_fame_phase singleton;
+	b6_reset_fixed_allocator(&singleton.fixed_allocator, singleton.buffer,
+				 sizeof(singleton.buffer) - 1);
+	b6_initialize_utf8_string(&singleton.name,
+				  &singleton.fixed_allocator.allocator);
+	return register_phase(&singleton.up, B6_UTF8("hall_of_fame"), &ops);
 }
 register_init(hall_of_fame_phase_ctor);

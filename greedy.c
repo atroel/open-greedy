@@ -221,9 +221,10 @@ static int greedy(struct b6_clock *clock)
 		set_pref_game(&preferences, b6_utf8_from_ascii(&utf8, game));
 	if (lang)
 		set_pref_lang(&preferences, b6_utf8_from_ascii(&utf8, lang));
-	if (!setup_engine(&engine, clock, console, mixer, &preferences,
-			  languages)) {
+	if (!initialize_engine(&engine, clock, console, mixer, &preferences,
+			       languages)) {
 		run_engine(&engine);
+		finalize_engine(&engine);
 		retval = EXIT_SUCCESS;
 	}
 	save_pref(&preferences);

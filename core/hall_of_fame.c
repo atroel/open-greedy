@@ -18,49 +18,272 @@
  */
 
 #include "hall_of_fame.h"
-#include "env.h"
-#include "lib/io.h"
-#include "lib/log.h"
-#include "lib/std.h"
+
 #include <b6/registry.h>
 #include <b6/utf8.h>
 
-B6_REGISTRY_DEFINE(hall_of_fame_registry);
+#include "env.h"
+#include "json.h"
+#include "lib/io.h"
+#include "lib/log.h"
+#include "lib/rng.h"
+#include "lib/std.h"
 
-struct hall_of_fame_entry *get_hall_of_fame_entry(struct hall_of_fame *self,
-						  unsigned long int level,
-						  unsigned long int score)
+static const struct b6_utf8 label_key = B6_DEFINE_UTF8("label");
+static const struct b6_utf8 level_key = B6_DEFINE_UTF8("level");
+static const struct b6_utf8 score_key = B6_DEFINE_UTF8("score");
+
+int initialize_hall_of_fame(struct hall_of_fame *self, struct b6_json *json,
+			    const char *path)
 {
-	struct hall_of_fame_iterator iter;
-	struct hall_of_fame_entry *entry;
-	setup_hall_of_fame_iterator(self, &iter);
-	while ((entry = hall_of_fame_iterator_next(&iter))) {
-		if (score <= entry->score)
-			continue;
-		if (&entry->dref != b6_list_last(&self->list)) {
-			struct b6_dref *r = b6_list_del_last(&self->list);
-			b6_list_add(&entry->dref, r);
-			entry = b6_cast_of(r, struct hall_of_fame_entry, dref);
-		}
-		entry->level = level;
-		entry->score = score;
-		return entry;
+	struct b6_utf8 utf8[2];
+	const char *base = get_rw_dir();
+	b6_reset_fixed_allocator(&self->path_allocator, self->path_buffer,
+				 sizeof(self->path_buffer));
+	b6_initialize_utf8_string(&self->path, &self->path_allocator.allocator);
+	b6_utf8_from_ascii(&utf8[0], base);
+	b6_utf8_from_ascii(&utf8[1], path);
+	if (b6_extend_utf8_string(&self->path, &utf8[0]) ||
+	    b6_extend_utf8_string(&self->path, &utf8[1])) {
+		log_e("path is too long: %s%s", base, path);
+		return -2;
 	}
-	return NULL;
+	if (!(self->object = b6_json_new_object(json))) {
+		log_e("out of memory");
+		b6_finalize_utf8_string(&self->path);
+		return -1;
+	}
+	return 0;
 }
 
-void put_hall_of_fame_entry(struct hall_of_fame *self,
-			    struct hall_of_fame_entry *entry, const char *name)
+void finalize_hall_of_fame(struct hall_of_fame *self)
 {
-	int i = 0;
-	while (*name && i < b6_card_of(entry->name)) {
-		char c = *name++;
-		if (c < ' ')
-			c = '.';
-		entry->name[i++] = c;
+	b6_finalize_utf8_string(&self->path);
+	b6_json_unref_value(&self->object->up);
+}
+
+static enum b6_json_error set_number(struct b6_json_object *object,
+				     const struct b6_utf8* key, double value)
+{
+	struct b6_json_number *number;
+	enum b6_json_error error = B6_JSON_ALLOC_ERROR;
+	if (!(number = b6_json_new_number(object->json, value))) {
+		log_e("b6_json_new_number: ", b6_json_strerror(error));
+		b6_json_unref_value(&object->up);
+		return error;
 	}
-	if (i < b6_card_of(entry->name))
-		entry->name[i] = '\0';
+	if ((error = b6_json_set_object(object, key, &number->up))) {
+		log_e("b6_json_set_object: ", b6_json_strerror(error));
+		b6_json_unref_value(&number->up);
+		b6_json_unref_value(&object->up);
+	}
+	return error;
+}
+
+static enum b6_json_error get_number(const struct b6_json_object *object,
+				     const struct b6_utf8* key, double *value)
+{
+	struct b6_json_number *number;
+	if (!(number = b6_json_get_object_as(object, key, number)))
+		return B6_JSON_ERROR;
+	*value = b6_json_get_number(number);
+	return B6_JSON_OK;
+}
+
+static void swap_entries(struct b6_json_array *a,
+			 unsigned int i, unsigned int j)
+{
+	struct b6_json_value *v = b6_json_ref_value(b6_json_get_array(a, i));
+	struct b6_json_value *u = b6_json_ref_value(b6_json_get_array(a, j));
+	b6_json_set_array(a, i, u);
+	b6_json_set_array(a, j, v);
+}
+
+static int comp_entries(const struct b6_json_object *lhs,
+			const struct b6_json_object *rhs)
+{
+	double l = 0, r = 0;
+	get_number(lhs, &score_key, &l);
+	get_number(rhs, &score_key, &r);
+	if (l < r)
+		return 1;
+	if (l > r)
+		return -1;
+	get_number(lhs, &level_key, &l);
+	get_number(rhs, &level_key, &r);
+	if (l < r)
+		return 1;
+	if (l > r)
+		return -1;
+	return 0;
+}
+
+static void sort_entries(struct b6_json_array *array,
+			 unsigned int i, unsigned int n)
+{
+	struct b6_json_object *obj[2];
+	if (n > 2) {
+		unsigned int k, j = i + read_random_number_generator() * n;
+		if (j > i)
+			swap_entries(array, i, j);
+		obj[0] = b6_json_get_array_as(array, j, object);
+		j = i + 1;
+		k = i + n - 1;
+		for (;;) {
+			obj[1] = b6_json_get_array_as(array, k, object);
+			if (comp_entries(obj[0], obj[1]) > 0) {
+				unsigned int l = j;
+				if (j++ >= k)
+					break;
+				swap_entries(array, l, k);
+			} else if (j >= --k)
+				break;
+		}
+		k = j - i;
+		sort_entries(array, i, k);
+		sort_entries(array, j, n - k);
+	} else if (n == 2) {
+		obj[0] = b6_json_get_array_as(array, i, object);
+		obj[1] = b6_json_get_array_as(array, i + 1, object);
+		if (comp_entries(obj[0], obj[1]) > 0)
+			swap_entries(array, i, i + 1);
+	}
+}
+
+int load_hall_of_fame(struct hall_of_fame *self)
+{
+	unsigned char zbuf[2048];
+	struct izstream zs;
+	struct ifstream fs;
+	struct json_istream js;
+	struct b6_json_parser_info info;
+	enum b6_json_error error;
+	struct b6_json_iterator it, jt;
+	const struct b6_json_pair *pair;
+	log_i("%s", self->path.utf8.ptr);
+	if (initialize_ifstream(&fs, self->path.utf8.ptr)) {
+		log_w("cannot open %s", self->path.utf8.ptr);
+		return -2;
+	}
+	if (initialize_izstream(&zs, &fs.istream, zbuf, sizeof(zbuf))) {
+		log_e("cannot create izstream");
+		finalize_ifstream(&fs);
+		return -1;
+	}
+	setup_json_istream(&js, &zs.up);
+	if ((error = b6_json_parse_object(self->object, &js.up, &info)))
+		log_e("json: %s", b6_json_strerror(error));
+	finalize_izstream(&zs);
+	finalize_ifstream(&fs);
+	if (error)
+		return -1;
+	for (b6_json_setup_iterator(&it, self->object);
+	     (pair = b6_json_get_iterator(&it));
+	     b6_json_advance_iterator(&it)) {
+		struct b6_json_object *o;
+		struct b6_json_array *a;
+		if (!(o = b6_json_value_as_or_null(pair->value, object)))
+			continue;
+		for (b6_json_setup_iterator(&jt, o);
+		     (pair = b6_json_get_iterator(&jt));
+		     b6_json_advance_iterator(&jt))
+			if ((a = b6_json_value_as_or_null(pair->value, array)))
+				sort_entries(a, 0, b6_json_array_len(a));
+	}
+	return 0;
+}
+
+int save_hall_of_fame(const struct hall_of_fame *self)
+{
+	unsigned char zbuf[2048];
+	struct ozstream zs;
+	struct ofstream fs;
+	struct json_ostream js;
+	struct b6_json_default_serializer serializer;
+	enum b6_json_error error;
+	log_i("%s", self->path.utf8.ptr);
+	initialize_ofstream(&fs, self->path.utf8.ptr);
+	if (initialize_ozstream(&zs, &fs.ostream, zbuf, sizeof(zbuf))) {
+		log_e("cannot create ozstream");
+		finalize_ofstream(&fs);
+		return -1;
+	}
+	initialize_json_ostream(&js, &zs.up);
+	b6_json_setup_default_serializer(&serializer);
+	if ((error = b6_json_serialize_object(self->object, &js.up,
+					      &serializer.up)))
+		log_e("json: %s", b6_json_strerror(error));
+	finalize_json_ostream(&js);
+	finalize_ozstream(&zs);
+	finalize_ofstream(&fs);
+	return -error;
+}
+
+int split_hall_of_fame_entry(struct b6_json_object *object,
+			     unsigned int *level, unsigned int *score,
+			     const struct b6_utf8 **label)
+{
+	double l, s;
+	struct b6_json_string *j;
+	if (get_number(object, &level_key, &l) ||
+	    get_number(object, &score_key, &s) ||
+	    (!(j = b6_json_get_object_as(object, &label_key, string))))
+		return -1;
+	*level = l;
+	*score = s;
+	*label = b6_json_get_string(j);
+	return 0;
+}
+
+int alter_hall_of_fame_entry(struct b6_json_object *object,
+			     const struct b6_utf8* label)
+{
+	struct b6_json_string *s;
+	if (!(s = b6_json_new_string(object->json, label)))
+		return -1;
+	b6_json_set_object(object, &label_key, &s->up);
+	return 0;
+}
+
+struct b6_json_object *amend_hall_of_fame(struct b6_json_array *array,
+					  unsigned long int level,
+					  unsigned long int score) {
+	static const int max_len = 10;
+	struct b6_json_object *o = b6_json_new_object(array->json);
+	unsigned int n = b6_json_array_len(array);
+	unsigned int i = 0;
+	unsigned int k = n;
+	enum b6_json_error error;
+	if (!o) {
+		log_e("b6_json_new_object: out of memory");
+		return NULL;
+	}
+	if (set_number(o, &level_key, level) ||
+	    set_number(o, &score_key, score)) {
+		b6_json_unref_value(&o->up);
+		return NULL;
+	}
+	while (i != k) {
+		unsigned int j = (i + k) / 2;
+		int r = comp_entries(o, b6_json_get_array_as(array, j, object));
+		if (r > 0)
+			i = j + 1;
+		else {
+			k = j;
+			if (!r)
+				break;
+		}
+	}
+	if ((error = b6_json_add_array(array, k, &o->up))) {
+		log_e("b6_json_add_array: %s", b6_json_strerror(error));
+		b6_json_unref_value(&o->up);
+		return NULL;
+	}
+	while (n >= max_len)
+		b6_json_del_array(array, n--);
+	if (i > n)
+		return NULL;
+	return o;
 }
 
 static int read_u32(struct istream *istream, unsigned int *value)
@@ -76,146 +299,104 @@ static int read_u32(struct istream *istream, unsigned int *value)
 	return 0;
 }
 
-static int read_hall_of_fame_entry(struct hall_of_fame_entry *self,
-				   struct istream *istream)
+static int load_legacy_hall_of_fame(struct b6_json_array *self,
+				    const char *levels,
+				    const struct b6_utf8 *config)
 {
-       	int retval = read_istream(istream, self->name, sizeof(self->name));
-	if (retval < sizeof(self->name))
-		return -1;
-	if (read_u32(istream, &self->level))
-		return -1;
-	return read_u32(istream, &self->score);
-}
-
-static int read_hall_of_fame(struct hall_of_fame *self, struct istream *istream)
-{
-	int retval;
-	struct hall_of_fame_iterator iter;
-	struct hall_of_fame_entry *entry;
-	struct izstream izs;
-	char zbuf[1024];
-	if ((retval = initialize_izstream(&izs, istream, zbuf, sizeof(zbuf))))
+	struct b6_utf8_string path;
+	struct b6_fixed_allocator fixed_allocator;
+	char buffer[512];
+	struct b6_utf8 utf8;
+	struct ifstream fs;
+	struct izstream zs;
+	unsigned char zbuf[512];
+	const char *base = get_rw_dir();
+	int i, retval;
+	b6_reset_fixed_allocator(&fixed_allocator, buffer, sizeof(buffer));
+	b6_initialize_utf8_string(&path, &fixed_allocator.allocator);
+	if (b6_extend_utf8_string(&path, b6_utf8_from_ascii(&utf8, base)) ||
+	    b6_extend_utf8_string(&path, b6_utf8_from_ascii(&utf8, levels)) ||
+	    b6_append_utf8_string(&path, '.') ||
+	    b6_extend_utf8_string(&path, config) ||
+	    b6_append_utf8_string(&path, '.') ||
+	    b6_append_utf8_string(&path, 'h') ||
+	    b6_append_utf8_string(&path, 'o') ||
+	    b6_append_utf8_string(&path, 'f')) {
+		log_e("path is too long");
+		retval = -1;
+		goto fail_fstream;
+	}
+	log_i("%s", path.utf8.ptr);
+	if ((retval = initialize_ifstream(&fs, path.utf8.ptr)))
+		goto fail_fstream;
+	if (initialize_izstream(&zs, &fs.istream, zbuf, sizeof(zbuf)))
 		goto fail_zstream;
-	setup_hall_of_fame_iterator(self, &iter);
-	while ((entry = hall_of_fame_iterator_next(&iter)))
-		if ((retval = read_hall_of_fame_entry(entry, &izs.up)))
+	for (i = 0; i < 10; i += 1) {
+		char name[17];
+		unsigned int level, score;
+		struct b6_json_object *o;
+		retval = read_istream(&zs.up, name, sizeof(name) - 1);
+		if (retval != sizeof(name) - 1 ||
+		    (retval = read_u32(&zs.up, &level)) ||
+		    (retval = read_u32(&zs.up, &score))) {
+			log_e("read: i/o error");
 			break;
-	finalize_izstream(&izs);
-fail_zstream:
-	return retval;
-}
-
-static int write_u32(struct ostream *ostream, unsigned int value)
-{
-	unsigned char buffer[sizeof(value)];
-	int i;
-	b6_static_assert(sizeof(buffer) == 4);
-	for (i = 0; i < b6_card_of(buffer); i += 1) {
-		buffer[i] = value & 0xff;
-		value /= 256;
-	}
-	if (write_ostream(ostream, buffer, sizeof(buffer)) < sizeof(buffer))
-	       return -1;
-	return 0;
-}
-
-static int write_hall_of_fame_entry(const struct hall_of_fame_entry *self,
-				struct ostream *ostream)
-{
-	write_ostream(ostream, self->name, sizeof(self->name));
-	write_u32(ostream, self->level);
-	write_u32(ostream, self->score);
-	return 0;
-}
-
-static int write_hall_of_fame(const struct hall_of_fame *self,
-			      struct ostream *ostream)
-{
-	int retval = 0;
-	struct hall_of_fame_iterator iter;
-	const struct hall_of_fame_entry *entry;
-	struct ozstream ozs;
-	char zbuf[1024];
-	if ((retval = initialize_ozstream(&ozs, ostream, zbuf, sizeof(zbuf))))
-		goto fail_zstream;
-	setup_hall_of_fame_iterator(self, &iter);
-	while ((entry = hall_of_fame_iterator_next(&iter)))
-		if ((retval = write_hall_of_fame_entry(entry, &ozs.up)))
-			break;
-	finalize_ozstream(&ozs);
-fail_zstream:
-	return retval;
-}
-
-struct hall_of_fame *load_hall_of_fame(const char *levels_name,
-				       const struct b6_utf8 *config_name)
-{
-	struct b6_utf8_string name;
-	struct ifstream ifs;
-	struct b6_entry *entry;
-	struct hall_of_fame *self;
-	struct b6_utf8 utf8[2];
-	int retval, i;
-	b6_initialize_utf8_string(&name, &b6_std_allocator);
-	b6_utf8_from_ascii(&utf8[0], get_rw_dir());
-	b6_utf8_from_ascii(&utf8[1], levels_name);
-	if (b6_extend_utf8_string(&name, &utf8[0]) ||
-	    b6_append_utf8_string(&name, '/') ||
-	    b6_extend_utf8_string(&name, &utf8[1]) ||
-	    b6_append_utf8_string(&name, '.') ||
-	    b6_extend_utf8_string(&name, config_name) ||
-	    b6_append_utf8_string(&name, '.') ||
-	    b6_append_utf8_string(&name, 'h') ||
-	    b6_append_utf8_string(&name, 'o') ||
-	    b6_append_utf8_string(&name, 'f')) {
-		log_e("out of memory");
-		b6_finalize_utf8_string(&name);
-		return NULL;
-	}
-	if ((entry = b6_lookup_registry(&hall_of_fame_registry, &name.utf8))) {
-		b6_finalize_utf8_string(&name);
-		return b6_cast_of(entry, struct hall_of_fame, entry);
-	}
-	log_i("%s not in cache.", name.utf8.ptr);
-	if (!(self = b6_allocate(&b6_std_allocator, sizeof(*self)))) {
-		log_e("out of memory for %s", name.utf8.ptr);
-		b6_finalize_utf8_string(&name);
-		return NULL;
-	}
-	b6_swap_utf8_string(&self->name, &name);
-	b6_list_initialize(&self->list);
-	for (i = 0; i < b6_card_of(self->entries); i += 1)
-		b6_list_add_last(&self->list, &self->entries[i].dref);
-	if (initialize_ifstream(&ifs, self->name.utf8.ptr) ||
-	    read_hall_of_fame(self, &ifs.istream)) {
-		for (i = 0; i < b6_card_of(self->entries); i += 1) {
-			struct hall_of_fame_entry *entry = &self->entries[i];
-			entry->name[0] = '\0';
-			entry->score = 0UL;
-			entry->level = 0UL;
 		}
-		log_w("created %s", self->name.utf8.ptr);
-	} else
-		log_w("loaded %s", self->name.utf8.ptr);
-	retval = b6_register(&hall_of_fame_registry, &self->entry,
-			     &self->name.utf8);
-	if (retval) {
-		log_e("could not register %s (%d)", self->name.utf8.ptr,
-		      retval);
-		b6_finalize_utf8_string(&self->name);
-		b6_deallocate(&b6_std_allocator, self);
-		self = NULL;
+		retval = -1;
+		if (!(o = amend_hall_of_fame(self, level, score)))
+			break;
+		name[sizeof(name) - 1] = '\0';
+		alter_hall_of_fame_entry(o, b6_utf8_from_ascii(&utf8, name));
 	}
-	return self;
+	finalize_izstream(&zs);
+fail_zstream:
+	finalize_ifstream(&fs);
+fail_fstream:
+	b6_finalize_utf8_string(&path);
+	return retval;
 }
 
-int save_hall_of_fame(struct hall_of_fame *self)
+struct b6_json_array *open_hall_of_fame(struct hall_of_fame *self,
+					const char *levels,
+					const struct b6_utf8 *config)
 {
-	struct ofstream ofs;
-	int retval;
-	if (!(retval = initialize_ofstream(&ofs, self->name.utf8.ptr))) {
-		retval = write_hall_of_fame(self, &ofs.ostream);
-		finalize_ofstream(&ofs);
+	struct b6_utf8 utf8;
+	struct b6_json_object *object;
+	struct b6_json_array *array;
+	enum b6_json_error error;
+	b6_utf8_from_ascii(&utf8, levels);
+	if (!(object = b6_json_get_object_as(self->object, &utf8, object))) {
+		if (!(object = b6_json_new_object(self->object->json))) {
+			log_e("cannot create object");
+			return NULL;
+		}
+		error = b6_json_set_object(self->object, &utf8, &object->up);
+		if (error) {
+			log_e("cannot set object");
+			b6_json_unref_value(&object->up);
+			return NULL;
+		}
 	}
-	return retval;
+	if (!(array = b6_json_get_object_as(object, config, array))) {
+		if (!(array = b6_json_new_array(object->json))) {
+			log_e("cannot create array");
+			b6_json_del_object_at(self->object, &utf8);
+			return NULL;
+		}
+		if ((error = b6_json_set_object(object, config, &array->up))) {
+			log_e("cannot set array");
+			b6_json_del_object_at(self->object, &utf8);
+			b6_json_unref_value(&array->up);
+			return NULL;
+		}
+	}
+	if (!b6_json_array_len(array))
+		load_legacy_hall_of_fame(array, levels, config);
+	b6_json_ref_value(&array->up);
+	return array;
+}
+
+void close_hall_of_fame(struct b6_json_array *array)
+{
+	b6_json_unref_value(&array->up);
 }
