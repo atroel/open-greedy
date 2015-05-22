@@ -149,8 +149,8 @@ enum direction {
 };
 
 #define for_each_direction(_d) \
-	(void)(&(_d) == (enum direction*)NULL); \
-	for (_d = LEVEL_E; _d <= LEVEL_N; _d += 1)
+	for (_d = LEVEL_E, (void)(&(_d) == (enum direction*)NULL); \
+	     _d <= LEVEL_N; _d += 1)
 
 static inline int get_opposite(enum direction d) { return d ^ 1; }
 
