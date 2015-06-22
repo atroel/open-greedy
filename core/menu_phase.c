@@ -148,7 +148,7 @@ static void setup_menu_entry(struct menu_entry *entry,
 {
 	const struct b6_json_string *text;
 	if (!(text = b6_json_get_object_as(lang, key, string)))
-		log_w("could not find menu text entry");
+		log_w(_s("could not find menu text entry"));
 	else
 		key = b6_json_get_string(text);
 	b6_clone_utf8(&entry->utf8, key);
@@ -436,19 +436,19 @@ static int menu_phase_init(struct phase *up, const struct phase *prev)
 	lang = b6_json_value_as(get_engine_language(up->engine)->value, object);
 	self->lang = b6_json_get_object_as(lang, B6_UTF8("menu"), object);
 	if (!self->lang) {
-		log_e("cannot find menu json object");
+		log_e(_s("cannot find menu json object"));
 		return -1;
 	}
 	if (!(self->game_phase = lookup_phase(B6_UTF8("game")))) {
-		log_e("cannot find \"game\" phase");
+		log_e(_s("cannot find \"game\" phase"));
 		return -1;
 	}
 	if (!(self->hof_phase = lookup_phase(B6_UTF8("hall_of_fame")))) {
-		log_e("cannot find \"hall_of_fame\" phase");
+		log_e(_s("cannot find \"hall_of_fame\" phase"));
 		return -1;
 	}
 	if (!(self->credits_phase = lookup_phase(B6_UTF8("credits")))) {
-		log_e("cannot find \"credits\" phase");
+		log_e(_s("cannot find \"credits\" phase"));
 		return -1;
 	}
 	self->next = up;
@@ -462,7 +462,7 @@ static int menu_phase_init(struct phase *up, const struct phase *prev)
 					  get_engine_renderer(up->engine),
 					  up->engine->clock, skin_id);
 	if (retval) {
-		log_e("cannot initialize menu renderer (%d)", retval);
+		logf_e("cannot initialize menu renderer (%d)", retval);
 		return -1;
 	}
 	setup_menu_observer(&self->menu_observer, &menu_observer_ops);

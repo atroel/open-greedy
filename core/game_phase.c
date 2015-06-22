@@ -63,19 +63,19 @@ static int game_phase_init(struct phase *up, const struct phase *prev)
 				      up->engine->game_config,
 				      get_engine_layouts(up->engine),
 				      game_result.level))) {
-		log_e("cannot initialize game (%d)", retval);
+		logf_e("cannot initialize game (%d)", retval);
 		goto fail_game;
 	}
 	lang = b6_json_value_as(get_engine_language(up->engine)->value, object);
 	if (!(lang = b6_json_get_object_as(lang, B6_UTF8("game"), object))) {
-		log_e("cannot find game text");
+		log_e(_s("cannot find game text"));
 		goto fail_renderer;
 	}
 	if ((retval = initialize_game_renderer(&self->renderer,
 					       get_engine_renderer(up->engine),
 					       &self->clock.up, &self->game,
 					       skin_id, lang))) {
-		log_e("cannot initialize game renderer (%d)", retval);
+		logf_e("cannot initialize game renderer (%d)", retval);
 		goto fail_renderer;
 	}
 	initialize_game_mixer(&self->mixer, &self->game, skin_id,

@@ -184,7 +184,7 @@ static int register_greedy_image_data(struct greedy_image_data *self,
 	self->count = 0;
 	retval = register_data(&self->up, &greedy_image_data_entry_ops, name);
 	if (retval)
-		log_e("could not register %s", name);
+		log_e(_s("could not register "), _t(name));
 	return retval;
 }
 
@@ -357,10 +357,10 @@ static int greedy_skin_ctor(void)
 	register_greedy_level("75"); register_greedy_level("76");
 	register_greedy_level("77"); register_greedy_level("78");
 	if (reset_data_layout_provider(&layout_provider, "greedy"))
-		log_w("No levels: skipping registration.");
+		log_w(_s("No levels: skipping registration"));
 	else if (register_layout_provider(&layout_provider.up,
 					  B6_UTF8("Greedy XP")))
-		log_e("Could not register levels.");
+		log_e(_s("Could not register levels"));
 
 	greedy_image_resource(GREEDY_FONT, "font");
 	greedy_image_resource(GREEDY_GAME_PANEL, "game_panel");

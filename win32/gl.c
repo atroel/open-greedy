@@ -31,7 +31,7 @@ static void *get_gl_extension(const char *name)
 {
 	void *proc = (void*)wglGetProcAddress(name);
 	if (!proc)
-		log_w("\"%s\" is not available.", name);
+		logf_w("\"%s\" is not available", name);
 	return proc;
 }
 

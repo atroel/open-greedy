@@ -875,7 +875,7 @@ static void do_update(struct game *self)
 	unsigned long long int now = b6_get_stopwatch_time(&self->stopwatch);
 	unsigned long long int delta = now - self->time;
 	if (!get_next_ops(self) && !self->stopwatch.frozen && delta >= 30000) {
-		log_w("game catching up: %llu", delta);
+		logf_w("game catching up: %llu", delta);
 		do
 			do_update_at(self, self->time + 10000);
 		while (now - self->time > 10000);
@@ -900,7 +900,7 @@ static int init_level(struct game *self, int n)
 	int error = open_level(&self->level, &self->layout);
 	if (error) {
 		struct ofstream ofs;
-		log_w("skipping rejected layout #%d: %d", n, error);
+		logf_w("skipping rejected layout #%d: %d", n, error);
 		initialize_ofstream_with_fp(&ofs, stderr, 0);
 		print_layout(&self->layout, &ofs.ostream);
 		finalize_ofstream(&ofs);

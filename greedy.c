@@ -163,9 +163,9 @@ static struct b6_json_object *get_embedded_lang(struct b6_json *json)
 	info.row = info.col = 0;
 	b6_json_reset_parser_info(&info);
 	if (!(lang = b6_json_new_object(json)))
-		log_e("out of memory");
+		log_e(_s("out of memory"));
 	else if ((error = b6_json_parse_object(lang, &jis.up, &info))) {
-		log_e("json parsing failed (%d): row=%d col=%d", error,
+		logf_e("json parsing failed (%d): row=%d col=%d", error,
 		      info.row, info.col);
 		b6_json_unref_value(&lang->up);
 		lang = NULL;
@@ -192,10 +192,10 @@ static int greedy(struct b6_clock *clock)
 	init_all();
 	b6_utf8_from_ascii(&utf8, console_name);
 	if (!(console = lookup_console(&utf8))) {
-		log_e("unknown console: %s", console_name);
+		log_e(_s("unknown console: "), _s(console_name));
 		goto bail_out;
 	}
-	log_i("using %s console", console_name);
+	log_i(_s("using "), _s(console_name), _s(" console"));
 	mixer = lookup_mixer(B6_UTF8("sdl"));
 	if (open_mixer(mixer))
 		goto bail_out;
@@ -250,23 +250,23 @@ int main(int argc, char *argv[])
 	argn = b6_parse_command_line_flags(argc, argv, 0);
 	if (log_flag)
 		switch (*log_flag) {
-		case 'D': case 'd': log_level = LOG_DEBUG; break;
-		case 'I': case 'i': log_level = LOG_INFO; break;
-		case 'W': case 'w': log_level = LOG_WARNING; break;
-		case 'E': case 'e': log_level = LOG_ERROR; break;
-		case 'P': case 'p': log_level = LOG_PANIC; break;
+		case 'D': case 'd': log_level = LOG_D; break;
+		case 'I': case 'i': log_level = LOG_I; break;
+		case 'W': case 'w': log_level = LOG_W; break;
+		case 'E': case 'e': log_level = LOG_E; break;
+		case 'P': case 'p': log_level = LOG_P; break;
 		}
 	if (clock_name) {
 		b6_utf8_from_ascii(&utf8, clock_name);
 		if (!(clock_source = b6_lookup_named_clock(&utf8)))
-			log_e("cannot find clock %s", clock_name);
+			log_e(_s("cannot find clock "), _s(clock_name));
 	}
 	if (!clock_source && !(clock_source = b6_get_default_named_clock()))
-		log_p("cannot find a default clock");
-	log_clock = clock_source->clock;
-	log_i("using %s clock source", clock_source->entry.id->ptr);
+		log_p(_s("cannot find a default clock"));
+	set_log_clock(clock_source->clock);
+	log_i(_s("using "), _t(clock_source->entry.id), _s(" clock source"));
 	if (argn <= 0)
-		log_p("error parsing command line");
+		log_p(_s("error parsing command line"));
 	if (argn < argc &&
 	    (cmd = b6_lookup_cmd(b6_utf8_from_ascii(&utf8, argv[argn]))))
 		retval = b6_exec_cmd(cmd, argc - argn, argv + argn);

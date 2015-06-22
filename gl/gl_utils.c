@@ -78,7 +78,7 @@ static int push_gl_cli_buffer(struct gl_buffer *gl_buffer)
 {
 	float *t = b6_array_get(&gl_buffer->t, 0);
 	float *v = b6_array_get(&gl_buffer->v, 0);
-	log_i("pushing %u vertices", b6_array_length(&gl_buffer->t));
+	logf_i("pushing %u vertices", b6_array_length(&gl_buffer->t));
 	gl_call(glTexCoordPointer(2, GL_FLOAT, 0, t));
 	gl_call(glVertexPointer(2, GL_FLOAT, 0, v));
 	return 0;
@@ -147,13 +147,13 @@ int push_gl_srv_buffer(struct gl_buffer *gl_buffer)
 	const float *v = b6_array_get(&gl_buffer->v, 0);
 	const float *t = b6_array_get(&gl_buffer->t, 0);
 	if (size < v_size || size < t_size) {
-		log_e("integer overflow");
+		log_e(_s("integer overflow"));
 		return -2;
 	}
 	if (size < min_size)
 		size = min_size;
 	if (size > self->size) {
-		log_i("allocating %u bytes", size);
+		logf_i("allocating %u bytes", size);
 		self->size = size;
 		if (self->id != ~0UL)
 			destroy_gl_buffer(self->id);
@@ -161,7 +161,7 @@ int push_gl_srv_buffer(struct gl_buffer *gl_buffer)
 		bind_gl_buffer(self->id);
 		alloc_gl_buffer(size);
 	}
-	log_i("pushing %u/%u vertices", len, max);
+	logf_i("pushing %u/%u vertices", len, max);
 	p = map_gl_buffer();
 	q = p + max * 2;
 	while (len--) { *p++ = *t++; *p++ = *t++; *q++ = *v++; *q++ = *v++; }

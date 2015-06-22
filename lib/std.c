@@ -50,5 +50,5 @@ struct b6_allocator b6_std_allocator = { .ops = &std_allocator_ops };
 void b6_assert_handler(const char *func, const char *file, int line, int type,
 		       const char *cond)
 {
-	log_p("%s:%d: assertion failure (%s)", file, line, cond);
+	logf_p("%s:%d: assertion failure (%s)", file, line, cond);
 }

@@ -45,11 +45,11 @@ int initialize_hall_of_fame(struct hall_of_fame *self, struct b6_json *json,
 	b6_utf8_from_ascii(&utf8[1], path);
 	if (b6_extend_utf8_string(&self->path, &utf8[0]) ||
 	    b6_extend_utf8_string(&self->path, &utf8[1])) {
-		log_e("path is too long: %s%s", base, path);
+		log_e(_s("path is too long: "), _s(base), _s(path));
 		return -2;
 	}
 	if (!(self->object = b6_json_new_object(json))) {
-		log_e("out of memory");
+		log_e(_s("out of memory"));
 		b6_finalize_utf8_string(&self->path);
 		return -1;
 	}
@@ -68,12 +68,12 @@ static enum b6_json_error set_number(struct b6_json_object *object,
 	struct b6_json_number *number;
 	enum b6_json_error error = B6_JSON_ALLOC_ERROR;
 	if (!(number = b6_json_new_number(object->json, value))) {
-		log_e("b6_json_new_number: ", b6_json_strerror(error));
+		log_e(_s("b6_json_new_number: "), _s(b6_json_strerror(error)));
 		b6_json_unref_value(&object->up);
 		return error;
 	}
 	if ((error = b6_json_set_object(object, key, &number->up))) {
-		log_e("b6_json_set_object: ", b6_json_strerror(error));
+		log_e(_s("b6_json_set_object: "), _s(b6_json_strerror(error)));
 		b6_json_unref_value(&number->up);
 		b6_json_unref_value(&object->up);
 	}
@@ -160,19 +160,19 @@ int load_hall_of_fame(struct hall_of_fame *self)
 	enum b6_json_error error;
 	struct b6_json_iterator it, jt;
 	const struct b6_json_pair *pair;
-	log_i("%s", self->path.utf8.ptr);
+	log_i(_t(&self->path.utf8));
 	if (initialize_ifstream(&fs, self->path.utf8.ptr)) {
-		log_w("cannot open %s", self->path.utf8.ptr);
+		log_w(_s("cannot open "), _t(&self->path.utf8));
 		return -2;
 	}
 	if (initialize_izstream(&zs, &fs.istream, zbuf, sizeof(zbuf))) {
-		log_e("cannot create izstream");
+		log_e(_s("cannot create izstream"));
 		finalize_ifstream(&fs);
 		return -1;
 	}
 	setup_json_istream(&js, &zs.up);
 	if ((error = b6_json_parse_object(self->object, &js.up, &info)))
-		log_e("json: %s", b6_json_strerror(error));
+		log_e(_s("json: "), _s(b6_json_strerror(error)));
 	finalize_izstream(&zs);
 	finalize_ifstream(&fs);
 	if (error)
@@ -201,10 +201,10 @@ int save_hall_of_fame(const struct hall_of_fame *self)
 	struct json_ostream js;
 	struct b6_json_default_serializer serializer;
 	enum b6_json_error error;
-	log_i("%s", self->path.utf8.ptr);
+	log_i(_t(&self->path.utf8));
 	initialize_ofstream(&fs, self->path.utf8.ptr);
 	if (initialize_ozstream(&zs, &fs.ostream, zbuf, sizeof(zbuf))) {
-		log_e("cannot create ozstream");
+		log_e(_s("cannot create ozstream"));
 		finalize_ofstream(&fs);
 		return -1;
 	}
@@ -212,7 +212,7 @@ int save_hall_of_fame(const struct hall_of_fame *self)
 	b6_json_setup_default_serializer(&serializer);
 	if ((error = b6_json_serialize_object(self->object, &js.up,
 					      &serializer.up)))
-		log_e("json: %s", b6_json_strerror(error));
+		log_e(_s("json: "), _s(b6_json_strerror(error)));
 	finalize_json_ostream(&js);
 	finalize_ozstream(&zs);
 	finalize_ofstream(&fs);
@@ -255,7 +255,7 @@ struct b6_json_object *amend_hall_of_fame(struct b6_json_array *array,
 	unsigned int k = n;
 	enum b6_json_error error;
 	if (!o) {
-		log_e("b6_json_new_object: out of memory");
+		log_e(_s("b6_json_new_object: out of memory"));
 		return NULL;
 	}
 	if (set_number(o, &level_key, level) ||
@@ -275,7 +275,7 @@ struct b6_json_object *amend_hall_of_fame(struct b6_json_array *array,
 		}
 	}
 	if ((error = b6_json_add_array(array, k, &o->up))) {
-		log_e("b6_json_add_array: %s", b6_json_strerror(error));
+		log_e(_s("b6_json_add_array: "), _s(b6_json_strerror(error)));
 		b6_json_unref_value(&o->up);
 		return NULL;
 	}
@@ -322,11 +322,11 @@ static int load_legacy_hall_of_fame(struct b6_json_array *self,
 	    b6_append_utf8_string(&path, 'h') ||
 	    b6_append_utf8_string(&path, 'o') ||
 	    b6_append_utf8_string(&path, 'f')) {
-		log_e("path is too long");
+		log_e(_s("path is too long"));
 		retval = -1;
 		goto fail_fstream;
 	}
-	log_i("%s", path.utf8.ptr);
+	log_i(_t(&path.utf8));
 	if ((retval = initialize_ifstream(&fs, path.utf8.ptr)))
 		goto fail_fstream;
 	if (initialize_izstream(&zs, &fs.istream, zbuf, sizeof(zbuf)))
@@ -339,7 +339,7 @@ static int load_legacy_hall_of_fame(struct b6_json_array *self,
 		if (retval != sizeof(name) - 1 ||
 		    (retval = read_u32(&zs.up, &level)) ||
 		    (retval = read_u32(&zs.up, &score))) {
-			log_e("read: i/o error");
+			log_e(_s("read: i/o error"));
 			break;
 		}
 		retval = -1;
@@ -367,24 +367,24 @@ struct b6_json_array *open_hall_of_fame(struct hall_of_fame *self,
 	b6_utf8_from_ascii(&utf8, levels);
 	if (!(object = b6_json_get_object_as(self->object, &utf8, object))) {
 		if (!(object = b6_json_new_object(self->object->json))) {
-			log_e("cannot create object");
+			log_e(_s("cannot create object"));
 			return NULL;
 		}
 		error = b6_json_set_object(self->object, &utf8, &object->up);
 		if (error) {
-			log_e("cannot set object");
+			log_e(_s("cannot set object"));
 			b6_json_unref_value(&object->up);
 			return NULL;
 		}
 	}
 	if (!(array = b6_json_get_object_as(object, config, array))) {
 		if (!(array = b6_json_new_array(object->json))) {
-			log_e("cannot create array");
+			log_e(_s("cannot create array"));
 			b6_json_del_object_at(self->object, &utf8);
 			return NULL;
 		}
 		if ((error = b6_json_set_object(object, config, &array->up))) {
-			log_e("cannot set array");
+			log_e(_s("cannot set array"));
 			b6_json_del_object_at(self->object, &utf8);
 			b6_json_unref_value(&array->up);
 			return NULL;

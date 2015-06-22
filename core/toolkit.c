@@ -90,7 +90,7 @@ struct renderer_texture *make_texture(struct renderer *renderer,
 		texture = create_renderer_texture(renderer, &rgba);
 		finalize_rgba(&rgba);
 	} else
-		log_w("out of memory");
+		log_w(_s("out of memory"));
 	put_image_data(entry, data);
 bail_out:
 	return texture;

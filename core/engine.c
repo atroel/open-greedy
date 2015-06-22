@@ -63,7 +63,7 @@ void rotate_engine_language(struct engine *self)
 	}
 	for (;;) {
 		if (!pair)
-			log_p("no language found.");
+			log_p(_s("no language found"));
 		if (b6_json_value_is_of(pair->value, object))
 			break;
 		b6_json_advance_iterator(&self->iter);
@@ -81,15 +81,15 @@ static int setup_engine_language(struct engine *self,
 		pair = b6_json_get_iterator(&self->iter);
 		if (pair && b6_json_value_is_of(pair->value, object))
 			return 0;
-		log_w("cannot find preferences language");
+		log_w(_s("cannot find preferences language"));
 	}
 	b6_json_setup_iterator_at(&self->iter, languages, B6_UTF8("en"));
 	pair = b6_json_get_iterator(&self->iter);
 	if (pair && b6_json_value_is_of(pair->value, object)) {
-		log_i("falling back to \"en\" language");
+		log_i(_s("falling back to \"en\" language"));
 		return 0;
 	}
-	log_w("cannot find fallback language");
+	log_w(_s("cannot find fallback language"));
 	b6_json_setup_iterator(&self->iter, languages);
 	while ((pair = b6_json_get_iterator(&self->iter))) {
 		if (b6_json_value_is_of(pair->value, object))
@@ -165,18 +165,18 @@ int initialize_engine(struct engine *self, const struct b6_clock *clock,
 		utf8 = B6_UTF8("Greedy XP");
 	if (!(self->layout_provider = lookup_layout_provider(utf8))) {
 		self->layout_provider = get_default_layout_provider();
-		log_w("Falling back to default level set."); /* FIXME */
+		log_w(_s("Falling back to default level set")); /* FIXME */
 	}
 	self->quit = 0;
 	self->game_config = NULL;
 	if ((utf8 = get_pref_mode(self->pref))) {
 		self->game_config = lookup_game_config(utf8);
 		if (!self->game_config)
-			log_w("unknown specified game mode");
+			log_w(_s("unknown specified game mode"));
 	} else
-		log_w("no game mode specified");
+		log_w(_s("no game mode specified"));
 	if (!self->game_config) {
-		log_w("falling back default to game mode");
+		log_w(_s("falling back default to game mode"));
 		self->game_config = get_default_game_config();
 	}
 	set_pref_mode(self->pref, self->game_config->entry.id);

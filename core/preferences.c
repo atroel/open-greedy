@@ -51,12 +51,12 @@ int initialize_pref(struct preferences *self, struct b6_json *json,
 	if (b6_extend_utf8_string(&self->path, &utf8[0]) ||
 	    b6_append_utf8_string(&self->path, '/') ||
 	    b6_extend_utf8_string(&self->path, &utf8[1])) {
-		log_e("cannot compose path");
+		log_e(_s("cannot compose path"));
 		b6_finalize_utf8_string(&self->path);
 		return -1;
 	}
 	if (!(self->root = b6_json_new_object(json))) {
-		log_e("cannot create json object");
+		log_e(_s("cannot create json object"));
 		b6_finalize_utf8_string(&self->path);
 		return -1;
 	}
@@ -124,9 +124,10 @@ static void set_pref_string(struct preferences *self,
 	if ((str = b6_json_get_object_as(pref, &id_utf8, string)))
 		b6_json_set_string(str, utf8);
 	else if (!(str = b6_json_new_string(pref->json, utf8)))
-		log_e("cannot allocate %s", id);
+		log_e(_s("cannot allocate "), _s(id));
 	else if ((error = b6_json_set_object(pref, &id_utf8, &str->up))) {
-		log_e("cannot set %s (%s)", id, b6_json_strerror(error));
+		log_e("cannot set ", _s(id), _s("("),
+		      _s(b6_json_strerror(error)), _s(")"));
 		b6_json_unref_value(&str->up);
 	}
 }
@@ -225,11 +226,12 @@ void set_pref_level(struct preferences *self, unsigned int level,
 	if (!(pref = walk_json(self->root, path, b6_card_of(path), 1)))
 		return;
 	if (!(number = b6_json_new_number(self->root->json, level))) {
-		log_e("cannot allocate number");
+		log_e(_s("cannot allocate number"));
 		return;
 	}
 	if ((error = b6_json_set_object(pref, &level_utf8, &number->up))) {
-		log_e("cannot set number (%s)", b6_json_strerror(error));
+		log_e(_s("cannot set number ("), _s(b6_json_strerror(error)),
+		      _s(")"));
 		b6_json_unref_value(&number->up);
 	}
 }
@@ -260,17 +262,17 @@ int load_pref(struct preferences *self)
 	struct b6_json_parser_info info;
 	enum b6_json_error error;
 	if (initialize_ifstream(&fs, (char*)self->path.utf8.ptr)) {
-		log_e("cannot create file stream");
+		log_e(_s("cannot create file stream"));
 		return -1;
 	}
 	if (initialize_izstream(&zs, &fs.istream, buf, sizeof(buf))) {
-		log_e("cannot create decompression stream");
+		log_e(_s("cannot create decompression stream"));
 		finalize_ifstream(&fs);
 		return -1;
 	}
 	setup_json_istream(&js, &zs.up);
 	if ((error = b6_json_parse_object(self->root, &js.up, &info)))
-		log_e("%s", b6_json_strerror(error));
+		log_e(_s(b6_json_strerror(error)));
 	finalize_izstream(&zs);
 	finalize_ifstream(&fs);
 	return -(error != B6_JSON_OK);
@@ -287,14 +289,14 @@ int save_pref(struct preferences *self)
 	initialize_ofstream(&fs, self->path.utf8.ptr);
 	if (initialize_ozstream(&zs, &fs.ostream, buf, sizeof(buf))) {
 		finalize_ofstream(&fs);
-		log_e("cannot create compression stream");
+		log_e(_s("cannot create compression stream"));
 		return -1;
 	}
 	initialize_json_ostream(&js, &zs.up);
 	b6_json_setup_default_serializer(&serializer);
 	error = b6_json_serialize_object(self->root, &js.up, &serializer.up);
 	if (error)
-		log_e("%s", b6_json_strerror(error));
+		log_e(_s(b6_json_strerror(error)));
 	finalize_json_ostream(&js);
 	finalize_ozstream(&zs);
 	finalize_ofstream(&fs);

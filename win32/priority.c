@@ -27,5 +27,5 @@ b6_ctor(boost_priority);
 static void boost_priority(void)
 {
 	if (!SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS))
-		log_e("Setting priority class failed: %d", GetLastError());
+		logf_e("Setting priority class failed: %d", GetLastError());
 }

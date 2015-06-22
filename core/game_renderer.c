@@ -673,7 +673,7 @@ static int initialize_game_renderer_jewels(struct game_renderer_jewels *self,
 		renderer, skin_id, GAME_JEWEL_DATA_ID(7), 140, 20, base,
 		&self->tiles[6], &self->textures[6]);
 	if (retval) {
-		log_w("cannot allocate jewels");
+		log_w(_s("cannot allocate jewels"));
 		self->game_renderer = NULL;
 		finalize_game_renderer_jewels(self);
 	}
@@ -785,7 +785,7 @@ static void on_level_init(struct game_observer *game_observer)
 			data->rgba);
 		put_image_data(entry, data);
 	} else
-		log_e("cannot update playground texture");
+		log_e(_s("cannot update playground texture"));
 
 	initialize_level_iterator(&iterator, level);
 	self->pacgums = NULL;

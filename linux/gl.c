@@ -33,7 +33,7 @@ static void *get_gl_extension(const char *name)
 {
 	void *proc = (void*)glXGetProcAddress((GLubyte*)name);
 	if (!proc)
-		log_w("\"%s\" is not supported", name);
+		logf_w("\"%s\" is not supported", name);
 	return proc;
 }
 

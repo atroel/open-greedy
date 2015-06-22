@@ -202,14 +202,14 @@ static inline void start_renderer(struct renderer *self,
 static inline void stop_renderer(struct renderer *self)
 {
 	if (self->ntextures)
-		log_w("texture leak=%u", self->ntextures);
+		logf_w("texture leak=%u", self->ntextures);
 	if (self->ntiles)
-		log_w("tile leak=%u", self->ntiles);
+		logf_w("tile leak=%u", self->ntiles);
 	if (self->nbases)
-		log_w("base leak=%u", self->nbases);
-	log_d("max textures=%u", self->max_textures);
-	log_d("max tiles=%u", self->max_tiles);
-	log_d("max bases=%u", self->max_bases);
+		logf_w("base leak=%u", self->nbases);
+	logf_d("max textures=%u", self->max_textures);
+	logf_d("max tiles=%u", self->max_tiles);
+	logf_d("max bases=%u", self->max_bases);
 	if (self->ops->stop)
 		self->ops->stop(self);
 }
@@ -226,7 +226,7 @@ static inline struct renderer_base *create_renderer_base(
 	struct renderer_base *base =
 		self->ops->new_base(self, parent, name, x, y);
 	if (!base) {
-		log_e("could not allocate base %s", name);
+		log_e(_s("could not allocate base "), _s(name));
 		return NULL;
 	}
 	base->renderer = self;
@@ -243,7 +243,7 @@ static inline struct renderer_base *create_renderer_base_or_die(
 	struct renderer_base *base =
 		create_renderer_base(self, parent, name, x, y);
 	if (!base)
-		log_p("giving up");
+		log_p(_s("giving up"));
 	return base;
 }
 
@@ -255,7 +255,7 @@ static inline void destroy_renderer_base(struct renderer_base *self)
 	if (!self)
 		return;
 	if (b6_unlikely(!self->renderer->nbases))
-		log_p("double free");
+		log_p(_s("double free"));
 	self->renderer->nbases -= 1;
 	destroy_renderer_base_tiles(self);
 	destroy_renderer_base_children(self);
@@ -271,7 +271,8 @@ static inline struct renderer_tile *create_renderer_tile(
 	struct renderer_tile *tile =
 		self->ops->new_tile(self, parent, x, y, w, h, texture);
 	if (!tile) {
-		log_e("could not allocate tile for base %s", parent->name);
+		log_e(_s("could not allocate tile for base "),
+		      _s(parent->name));
 		return NULL;
 	}
 	tile->renderer = self;
@@ -288,7 +289,7 @@ static inline struct renderer_tile *create_renderer_tile_or_die(
 	struct renderer_tile *tile =
 		create_renderer_tile(self, parent, x, y, w, h, texture);
 	if (!tile)
-		log_p("giving up");
+		log_p(_s("giving up"));
 	return tile;
 }
 
@@ -297,7 +298,7 @@ static inline void destroy_renderer_tile(struct renderer_tile *self)
 	if (!self)
 		return;
 	if (b6_unlikely(!self->renderer->ntiles))
-		log_p("double free");
+		log_p(_s("double free"));
 	self->renderer->ntiles -= 1;
 	b6_list_del(&self->dref);
 	if (self->ops->dtor)
@@ -327,7 +328,7 @@ static inline struct renderer_texture *create_renderer_texture(
 {
 	struct renderer_texture *texture = self->ops->new_texture(self, rgba);
 	if (!texture) {
-		log_e("could not allocate texture");
+		log_e(_s("could not allocate texture"));
 		return NULL;
 	}
 	texture->renderer = self;
@@ -342,7 +343,7 @@ static inline struct renderer_texture *create_renderer_texture_or_die(
 {
 	struct renderer_texture *texture = create_renderer_texture(self, rgba);
 	if (!texture)
-		log_p("giving up");
+		log_p(_s("giving up"));
 	return texture;
 }
 
@@ -357,7 +358,7 @@ static inline void destroy_renderer_texture(struct renderer_texture *self)
 	if (!self)
 		return;
 	if (b6_unlikely(!self->renderer->ntextures))
-		log_p("double free");
+		log_p(_s("double free"));
 	self->renderer->ntextures -= 1;
 	return self->ops->dtor(self);
 }
@@ -385,7 +386,8 @@ static inline void add_renderer_observer(struct renderer *w,
 					 struct renderer_observer *o)
 {
 	if (b6_unlikely(b6_observer_is_attached(&o->dref)))
-		log_w("observer %s is already registered", o->debug_name);
+		log_w(_s("observer "), _s(o->debug_name),
+		      _s(" is already registered"));
 	else
 		b6_attach_observer(&w->observers, &o->dref);
 }
@@ -393,7 +395,8 @@ static inline void add_renderer_observer(struct renderer *w,
 static inline void del_renderer_observer(struct renderer_observer *o)
 {
 	if (b6_unlikely(!b6_observer_is_attached(&o->dref)))
-		log_w("observer %s is not registered", o->debug_name);
+		log_w(_s("observer "), _s(o->debug_name),
+		      _s(" is not registered"));
 	else
 		b6_detach_observer(&o->dref);
 }

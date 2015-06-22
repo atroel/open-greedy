@@ -20,48 +20,74 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include "b6/clock.h"
-
-#define log_(level, format, args...) \
-	do { \
-		static const char lsym[] = { 'D', 'I', 'W', 'E', 'P' }; \
-		int lnum = b6_unlikely(level > LOG_PANIC) ? LOG_PANIC : level; \
-		unsigned long long int time = 0; \
-		if (b6_likely(lnum < log_level)) \
-			break; \
-		if (b6_likely(log_clock)) \
-			time = b6_get_clock_time(log_clock); \
-		log_internal(lnum, time, "%c %llu %s: " format "\n", \
-			     lsym[lnum], time, __func__, ##args); \
-	} while(0)
+#include <b6/clock.h>
 
 #ifdef NDEBUG
-#define log_d(format, args...) do {} while(0)
+#define log_d(...) do {} while(0)
 #else
-#define log_d(format, args...) log_(LOG_DEBUG, format, ##args)
+#define log_d(...) log_(LOG_D, __VA_ARGS__)
 #endif
+#define log_i(...) log_(LOG_I, __VA_ARGS__)
+#define log_w(...) log_(LOG_W, __VA_ARGS__)
+#define log_e(...) log_(LOG_E, __VA_ARGS__)
+#define log_p(...) log_(LOG_P, __VA_ARGS__)
 
-#define log_i(format, args...) log_(LOG_INFO, format, ##args)
-#define log_w(format, args...) log_(LOG_WARNING, format, ##args)
-#define log_e(format, args...) log_(LOG_ERROR, format, ##args)
-#define log_p(format, args...) log_(LOG_PANIC, format, ##args)
-
-enum log_level {
-	LOG_DEBUG,
-	LOG_INFO,
-	LOG_WARNING,
-	LOG_ERROR,
-	LOG_PANIC,
-};
+#ifdef NDEBUG
+#define logf_d(f, ...) do {} while(0)
+#else
+#define logf_d(f, ...) logf_(LOG_D, f, __VA_ARGS__)
+#endif
+#define logf_i(f, ...) logf_(LOG_I, f, __VA_ARGS__)
+#define logf_w(f, ...) logf_(LOG_W, f, __VA_ARGS__)
+#define logf_e(f, ...) logf_(LOG_E, f, __VA_ARGS__)
+#define logf_p(f, ...) logf_(LOG_P, f, __VA_ARGS__)
 
 extern enum log_level log_level;
-extern const struct b6_clock *log_clock;
+extern struct b6_clock *log_clock;
+
+enum log_level { LOG_D, LOG_I, LOG_W, LOG_E, LOG_P, };
 
 static inline void set_log_level(enum log_level level) { log_level = level; }
 
-extern int log_internal(enum log_level, unsigned long long int,
-			const char *format, ...);
+static inline void set_log_clock(struct b6_clock *clock) { log_clock = clock; }
 
 extern void log_flush(void);
+
+#define logf_(level, _format, ...) \
+	do { \
+		enum log_level _level = level; \
+		unsigned long long int _now = 0; \
+		if (b6_likely(_level < log_level)) \
+			break; \
+		if (log_clock) \
+			_now = b6_get_clock_time(log_clock); \
+		do_log_prolog(_level, _now, __func__); \
+		do_log_fmt(_format, __VA_ARGS__); \
+		do_log_epilog(_level, _now); \
+	} while (0)
+
+#define log_(level, ...) \
+	do { \
+		void (*const _f)(const char*, ...) = do_log_fmt; \
+		void (*const _s)(const char*) = do_log_str; \
+		void (*const _t)(const struct b6_utf8*) = do_log_utf8; \
+		unsigned long long int _now = 0; \
+		enum log_level _level = level; \
+		if (b6_likely(_level < log_level)) \
+			break; \
+		if (log_clock) \
+			_now = b6_get_clock_time(log_clock); \
+		(void)_f; \
+		(void)_s; \
+		(void)_t; \
+		for (do_log_prolog(_level, _now, __func__), __VA_ARGS__, \
+		     do_log_epilog(_level, _now);0;); \
+	} while(0)
+
+void do_log_fmt(const char*, ...);
+void do_log_str(const char*);
+void do_log_utf8(const struct b6_utf8*);
+void do_log_prolog(enum log_level, unsigned long long int, const char*);
+void do_log_epilog(enum log_level, unsigned long long int);
 
 #endif /* LOG_H */

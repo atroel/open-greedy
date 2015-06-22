@@ -33,33 +33,33 @@ void log_backtrace(void)
 	if (buf) {
 		int i;
 		for (i = 0; i < len; i += 1)
-			log_e("%s", buf[i]);
+			log_e(_s(buf[i]));
 		free(buf);
 		if (len == b6_card_of(ptr))
-			log_e("backtrace is truncated");
+			log_e(_s("backtrace is truncated"));
 	} else
-		log_e("failed getting backtrace symbols");
+		log_e(_s("failed getting backtrace symbols"));
 }
 
 static void crash_pad(int signum)
 {
 	switch (signum) {
-	case SIGINT:  log_e("interruption"); break;
-	case SIGTERM: log_e("termination request"); break;
-	case SIGABRT: log_e("aborting"); log_backtrace(); break;
-	case SIGFPE:  log_e("floating point exception"); log_backtrace(); break;
-	case SIGILL:  log_e("illegal instruction"); log_backtrace(); break;
-	case SIGSEGV: log_e("segmentation fault"); log_backtrace(); break;
-	case SIGBUS:  log_e("bus error"); log_backtrace(); break;
+	case SIGINT:  log_e(_s("interruption")); break;
+	case SIGTERM: log_e(_s("termination request")); break;
+	case SIGABRT: log_e(_s("aborting")); log_backtrace(); break;
+	case SIGFPE:  log_e(_s("floating point exception")); log_backtrace(); break;
+	case SIGILL:  log_e(_s("illegal instruction")); log_backtrace(); break;
+	case SIGSEGV: log_e(_s("segmentation fault")); log_backtrace(); break;
+	case SIGBUS:  log_e(_s("bus error")); log_backtrace(); break;
 	default:
-		log_e("caught signal #%d", signum);
+		logf_e("caught signal #%d", signum);
 		log_backtrace();
 	}
 	exit(EXIT_FAILURE);
 }
 
 #define __install_crash_pad(sig) do { \
-	log_i("signal %2d (%s)", sig, #sig); \
+	logf_i("signal %2d (%s)", sig, #sig); \
 	signal(sig, crash_pad); \
 } while (0)
 

@@ -36,7 +36,7 @@ extern GLenum gl_error;
 	_exp; \
 	error = glGetError(); \
 	if (b6_unlikely(error && error != gl_error)) \
-		log_e("OpenGL error 0x%04x %s", error, #_exp); \
+		logf_e("OpenGL error 0x%04x %s", error, #_exp); \
 	gl_error = error; \
 } while (0)
 

@@ -153,7 +153,7 @@ static int credits_phase_init(struct phase *up, const struct phase *prev)
 	font_h = get_fixed_font_height(&self->font);
 	lang = b6_json_value_as(get_engine_language(up->engine)->value, object);
 	if (!(array = b6_json_get_object_as(lang, B6_UTF8("credits"), array))) {
-		log_e("cannot find credits text");
+		log_e(_s("cannot find credits text"));
 		finalize_fixed_font(&self->font);
 		return -1;
 	}
@@ -167,7 +167,7 @@ static int credits_phase_init(struct phase *up, const struct phase *prev)
 							"labels", 0, 0);
 	self->nlines = b6_json_array_len(array);
 	if (self->nlines > b6_card_of(self->lines)) {
-		log_w("discarding extraneous lines (%u vs %u)",
+		logf_w("discarding extraneous lines (%u vs %u)",
 		      self->nlines, b6_card_of(self->lines));
 		self->nlines = b6_card_of(self->lines);
 	}

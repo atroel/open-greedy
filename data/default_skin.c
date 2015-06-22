@@ -144,7 +144,7 @@ do { \
 	setup_image_data(&data.image_data, &default_image_data_ops, NULL, \
 			 x, y, w, h, n, p); \
 	if ((register_data(&data.data_entry, &default_entry_ops, &data_id))) \
-		log_e("cannot register default image %s", image_id); \
+		log_e(_s("cannot register default image "), _s(image_id)); \
 } while (0)
 
 #define register_default_single_image_data(image_id, data_path, x, y, w, h) \
@@ -198,7 +198,7 @@ do { \
 		register_buffered_data( \
 			&data, embedded->buf, embedded->len, &utf8[1]); \
 	else \
-		log_e("embedded path not found: %s", path); \
+		log_e(_s("embedded path not found: "), _s(path)); \
 } while (0)
 
 #define register_embedded_level(num) \
@@ -214,7 +214,7 @@ do { \
 		register_cached_image_data( \
 			&data, embedded->buf, embedded->len, &utf8); \
 	} else \
-		log_p("embedded image path not found: %s", path); \
+		log_p(_s("embedded image path not found: "), _t(path)); \
 } while (0)
 
 #define register_external_data(_path, _name) \
@@ -286,7 +286,7 @@ static int default_skin_ctor(void)
 	if ((register_data(&layout_data.data_entry, &default_entry_ops,
 			   B6_UTF8(IMAGE_DATA_ID("default",
 						       GAME_LAYOUT_DATA_ID)))))
-		log_e("cannot register image data " GAME_LAYOUT_DATA_ID);
+		log_e(_s("cannot register image data " GAME_LAYOUT_DATA_ID));
 
 	register_default_single_image_data(GAME_PANEL_DATA_ID,
 					   "default_game.tga", 0, 0, 640, 80);
@@ -409,10 +409,10 @@ static int default_skin_ctor(void)
 	register_embedded_level("04");
 	register_embedded_level("05");
 	if (reset_data_layout_provider(&default_layout_provider, "default"))
-		log_p("could not initialize default levels.");
+		log_p(_s("could not initialize default levels"));
 	if (register_layout_provider(&default_layout_provider.up,
 				     B6_UTF8("Open Greedy")))
-		log_p("Could not register levels.");
+		log_p(_s("could not register levels"));
 
 	return 0;
 }

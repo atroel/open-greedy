@@ -38,10 +38,10 @@ int initialize_menu_mixer(struct menu_mixer *self, struct menu *menu,
 			play_music(mixer);
 			self->music = 1;
 		} else
-			log_w("could not load background music");
+			log_w(_s("could not load background music"));
 		put_data(data, is);
 	} else
-		log_w("cannot find background music");
+		log_w(_s("cannot find background music"));
 	add_menu_observer(self->menu,
 			  setup_menu_observer(&self->menu_observer, &ops));
 	return 0;

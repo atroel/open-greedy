@@ -60,11 +60,11 @@ int print_layout(const struct layout *layout, struct ostream *ostream)
 			ascii[x] = layout_to_char(layout->data[x][y]);
 		wsize = write_ostream(ostream, ascii, sizeof(ascii));
 		if (wsize < 0) {
-			log_e("i/o error #%d", (int)wsize);
+			logf_e("i/o error #%d", (int)wsize);
 			return -1;
 		}
 		if (wsize < sizeof(ascii)) {
-			log_e("truncated file");
+			log_e(_s("truncated file"));
 			return -1;
 		}
 	}
@@ -115,11 +115,11 @@ int parse_layout(struct layout *layout, struct istream *istream)
 	for (y = 0; y < LEVEL_HEIGHT + 2; y += 1) {
 		rsize = read_istream(istream, ascii, sizeof(ascii));
 		if (rsize < 0) {
-			log_e("i/o error #d", (int)rsize);
+			logf_e("i/o error #%d", (int)rsize);
 			return -1;
 		}
 		if (rsize < sizeof(ascii)) {
-			log_e("truncated stream");
+			log_e(_s("truncated stream"));
 			return -1;
 		}
 		for (x = 0; x < b6_card_of(ascii); x += 1)
@@ -189,11 +189,11 @@ static void initialize_place(struct level *level, struct layout *layout,
 		if (is_clear)
 			p->item = clone_super_pacgum(level->items);
 		else
-			log_w("no room for super pac gum at (%d,%d).", x, y);
+			logf_w("no room for super pac gum at (%d,%d)", x, y);
 		break;
 	case LAYOUT_BONUS:
 		if (!is_clear) {
-			log_w("no room for bonus at (%d,%d).", x, y);
+			logf_w("no room for bonus at (%d,%d)", x, y);
 			break;
 		}
 		level->bonus_place = p;
@@ -201,27 +201,27 @@ static void initialize_place(struct level *level, struct layout *layout,
 		break;
 	case LAYOUT_PACMAN:
 		if (!is_clear) {
-			log_w("no room for pacman home at (%d,%d).", x, y);
+			logf_w("no room for pacman home at (%d,%d)", x, y);
 			break;
 		}
 		p->item = clone_empty(level->items);
 		if (level->pacman_home)
-			log_w("ignored extra pacman home at (%d,%d).", x, y);
+			logf_w("ignored extra pacman home at (%d,%d)", x, y);
 		else
 			level->pacman_home = p;
 		break;
 	case LAYOUT_GHOSTS:
 		if (!is_clear)
-			log_w("ghosts den at (%d,%d) to be recovered.", x, y);
+			logf_w("ghosts den at (%d,%d) to be recovered", x, y);
 		p->item = clone_empty(level->items);
 		if (level->ghosts_home)
-			log_w("ignored extra ghosts den at (%d,%d).", x, y);
+			logf_w("ignored extra ghosts den at (%d,%d)", x, y);
 		else
 			level->ghosts_home = p;
 		break;
 	case LAYOUT_TELEPORT:
 		if (!(item = clone_teleport(level->items, p))) {
-			log_w("ignored extra teleport at (%d,%d).", x, y);
+			logf_w("ignored extra teleport at (%d,%d)", x, y);
 			if (is_clear)
 				p->item = clone_empty(level->items);
 		} else if (is_clear)
@@ -269,7 +269,7 @@ static void recover_ghosts_den(struct level *self, struct layout *layout)
 	place_location(self, self->ghosts_home, &xs, &ys);
 	if (is_place_clear(layout, xs, ys))
 		return;
-	log_i("recovering from non-accessible ghosts den.");
+	log_i(_s("recovering from non-accessible ghosts den"));
 	initialize_level_iterator(&iter, self);
 	while (level_iterator_has_next(&iter)) {
 		struct place *place = level_iterator_next(&iter);
@@ -282,12 +282,12 @@ static void recover_ghosts_den(struct level *self, struct layout *layout)
 		}
 	}
 	if (!closest_place) {
-		log_e("could not find the closest place to ghost den.");
+		log_e(_s("could not find the closest place to ghost den"));
 		return;
 	}
 	if (min_distance > ghost_den_recovery_radius) {
-		log_w("could not find a place close enough to ghost den "
-		      "(%u > %u).", min_distance, ghost_den_recovery_radius);
+		logf_w("could not find a place close enough to ghost den "
+		      "(%u > %u)", min_distance, ghost_den_recovery_radius);
 		return;
 	}
 	place_location(self, closest_place, &xd, &yd);
@@ -326,7 +326,7 @@ int __open_level(struct level *self, struct layout *layout)
 	} else if (self->teleport_places[0]) {
 		int x, y;
 		place_location(self, self->teleport_places[0], &x, &y);
-		log_w("ignored single teleport at (%d,%d).", x, y);
+		logf_w("ignored single teleport at (%d,%d)", x, y);
 		dispose_item(self->teleport_places[0]->item);
 		self->teleport_places[0]->item = clone_empty(self->items);
 		self->teleport_places[0] = NULL;
@@ -376,15 +376,15 @@ static int data_layout_provider_get(struct layout_provider *up, unsigned int n,
 	struct istream *istream;
 	int retval;
 	if (!(entry = lookup_data_layout(up->id, n))) {
-		log_w("could not find %s level #%d", up->id, n);
+		logf_w("could not find %s level #%d", up->id, n);
 		return -1;
 	}
 	if (!(istream = get_data(entry))) {
-		log_w("out of memory when reading %s level #%d", up->id, n);
+		logf_w("out of memory when reading %s level #%d", up->id, n);
 		return -1;
 	}
 	if ((retval = unserialize_layout(layout, istream)))
-		log_w("error %d when reading %s level #%d", up->id, retval, n);
+		logf_w("error %d when reading %s level #%d", up->id, retval, n);
 	put_data(entry, istream);
 	return retval;
 }

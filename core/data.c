@@ -71,21 +71,21 @@ int get_image_data_no_fallback(const char *skin_id, const char *data_id,
 			       struct image_data **data)
 {
 	if (!(*entry = lookup_data(skin_id, image_data_type, data_id))) {
-		log_w("cannot find %s.%s.%s", skin_id, image_data_type,
+		logf_w("cannot find %s.%s.%s", skin_id, image_data_type,
 		      data_id);
 		return -1;
 	}
 	struct istream *istream;
 	int retval;
 	if (!(istream = get_data(*entry))) {
-		log_w("cannot get %s.%s.%s", skin_id, image_data_type, data_id);
+		logf_w("cannot get %s.%s.%s", skin_id, image_data_type, data_id);
 		return -1;
 	}
 	*data = b6_cast_of(istream, struct image_data, up);
 	if (!(*data)->ops->ctor || !(retval = (*data)->ops->ctor(*data, param)))
 		return 0;
 	put_data(*entry, istream);
-	log_w("cannot read %s.%s.%s", skin_id, image_data_type, data_id);
+	logf_w("cannot read %s.%s.%s", skin_id, image_data_type, data_id);
 	return -1;
 }
 
@@ -96,7 +96,7 @@ int get_image_data(const char *skin_id, const char *data_id, void *param,
 	retval = get_image_data_no_fallback(skin_id, data_id, param,
 					    entry, data);
 	if (retval && *fallback) {
-		log_w("falling back to %s for %s", fallback, data_id);
+		logf_w("falling back to %s for %s", fallback, data_id);
 		retval = get_image_data_no_fallback(fallback, data_id, param,
 						    entry, data);
 	}

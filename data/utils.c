@@ -180,7 +180,7 @@ static int cached_image_data_ctor(struct image_data *up, void *param)
 					  izbstream_as_istream(&eis));
 	finalize_izbstream(&eis);
 	if (retval) {
-		log_e("inflating failed with error %d", retval);
+		logf_e("inflating failed with error %d", retval);
 		return -1;
 	}
 	self->image_data.rgba = &self->shared_rgba.rgba;
@@ -239,16 +239,16 @@ int load_external_data(struct membuf *self, const char *subpath)
 	long long int length;
 	char path[512];
 	if ((retval = make_external_data_path(subpath, path, sizeof(path)))) {
-		log_e("path is too long: %s/%s", get_data_path(), subpath);
+		logf_e("path is too long: %s/%s", get_data_path(), subpath);
 		return retval;
 	}
 	if ((retval = initialize_ifstream(&ifstream, path))) {
-		log_e("cannot open %s", path);
+		log_e(_s("cannot open "), _s(path));
 		return retval;
 	}
 	length = fill_membuf(self, &ifstream.istream);
 	if (length < 0) {
-		log_e("cannot read %s", path);
+		log_e(_s("cannot read "), _s(path));
 		retval = length;
 	}
 	finalize_ifstream(&ifstream);

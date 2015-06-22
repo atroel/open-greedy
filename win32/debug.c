@@ -25,20 +25,20 @@
 static void crash_pad(int signum)
 {
 	switch (signum) {
-	case SIGINT:  log_e("interruption"); break;
-	case SIGTERM: log_e("termination request"); break;
-	case SIGABRT: log_e("aborting"); break;
-	case SIGFPE:  log_e("floating point exception"); break;
-	case SIGILL:  log_e("illegal instruction"); break;
-	case SIGSEGV: log_e("segmentation fault"); break;
+	case SIGINT:  log_e(_s("interruption")); break;
+	case SIGTERM: log_e(_s("termination request")); break;
+	case SIGABRT: log_e(_s("aborting")); break;
+	case SIGFPE:  log_e(_s("floating point exception")); break;
+	case SIGILL:  log_e(_s("illegal instruction")); break;
+	case SIGSEGV: log_e(_s("segmentation fault")); break;
 	default:
-		log_e("caught signal #%d", signum);
+		logf_e("caught signal #%d", signum);
 	}
 	exit(EXIT_FAILURE);
 }
 
 #define __install_crash_pad(sig) do { \
-	log_i("signal %2d (%s)", sig, #sig); \
+	logf_i("signal %2d (%s)", sig, #sig); \
 	signal(sig, crash_pad); \
 } while (0)
 

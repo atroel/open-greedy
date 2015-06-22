@@ -34,14 +34,15 @@ static void start_game_mixer_music(struct state *up)
 	int retval;
 	mixer->music = 0;
 	if (!(is = get_data(mixer->music_data))) {
-		log_w("cannot get background music stream");
+		log_w(_s("cannot get background music stream"));
 		return;
 	}
-	if (!(retval = mixer->mixer->ops->load_music_from_stream(mixer->mixer, is))) {
+	retval = mixer->mixer->ops->load_music_from_stream(mixer->mixer, is);
+	if (!retval) {
 		mixer->music = 1;
 		play_music(mixer->mixer);
 	} else
-		log_w("could not load background music (%d)", retval);
+		logf_w("could not load background music (%d)", retval);
 	put_data(mixer->music_data, is);
 }
 
@@ -261,15 +262,15 @@ static void do_load_sample(struct mixer *mixer, const char *skin,
 	struct istream *istream;
 	*sample = NULL;
 	if (!(data = lookup_data(skin, audio_data_type, path))) {
-		log_w("could not find sample %s", name);
+		log_w(_s("could not find sample "), _s(name));
 		return;
 	}
 	if (!(istream = get_data(data))) {
-		log_w("out of memory when reading sample %s", name);
+		log_w(_s("out of memory when reading sample "), _s(name));
 		return;
 	}
 	if (!(*sample = mixer->ops->load_sample_from_stream(mixer, istream)))
-		log_w("could not read sample %s", name);
+		log_w(_s("could not read sample "), _s(name));
 	put_data(data, istream);
 }
 
@@ -345,7 +346,7 @@ int initialize_game_mixer(struct game_mixer *self, struct game *game,
 	self->music = 0;
 	if (!(self->music_data = lookup_data(skin_name, audio_data_type,
 					     GAME_MUSIC_DATA_ID)))
-		log_w("cannot find \"%s\" background music", skin_name);
+		log_w(_s("cannot find background music for "), _s(skin_name));
 	LOAD_SAMPLE(self, bonus, skin_name, GAME_SOUND_BONUS_DATA_ID);
 	LOAD_SAMPLE(self, joker, skin_name, GAME_SOUND_JOKER_DATA_ID);
 	LOAD_SAMPLE(self, hunter, skin_name, GAME_SOUND_RETURN_DATA_ID);

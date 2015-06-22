@@ -281,7 +281,7 @@ static int get_astar_distance(struct level *level, const struct items *items,
 				continue;
 			}
 			if (node->f < f) {
-				log_w("%u < %u", node->f, f);
+				logf_w("%u < %u", node->f, f);
 				continue;
 			}
 			node->g = g;

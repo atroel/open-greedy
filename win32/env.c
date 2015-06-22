@@ -154,7 +154,7 @@ const char *get_platform_user_name(void)
 	wchar_t buf[256];
 	DWORD len = sizeof(buf);
 	if (!GetUserNameW(buf, &len)) {
-		log_e("could not get user name: %d", GetLastError());
+		logf_e("could not get user name: %d", GetLastError());
 		return NULL;
 	}
 	*unicode_to_ascii(buf, len, ascii, sizeof(ascii) - 1) = '\0';

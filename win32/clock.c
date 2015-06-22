@@ -70,11 +70,11 @@ static void register_win32_clock(void)
 	};
 	LARGE_INTEGER li;
 	if (!QueryPerformanceFrequency(&li)) {
-		log_e("QueryPerformanceFrequency failed.");
+		log_e(_s("QueryPerformanceFrequency failed"));
 		return;
 	}
 	win32_clock.uperiod = 1e6/(double)li.QuadPart;
 	win32_clock.base = get_win32_ticks();
 	if (b6_register_named_clock(&win32_named_clock, B6_UTF8("win32")))
-		log_e("Could not register win32 clock.");
+		log_e(_s("could not register win32 clock"));
 }

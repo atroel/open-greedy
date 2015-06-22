@@ -284,10 +284,10 @@ static int hall_of_fame_phase_init(struct phase *up, const struct phase *prev)
 			play_music(up->engine->mixer);
 			self->music = 1;
 		} else
-			log_w("could not load background music");
+			log_w(_s("could not load background music"));
 		put_data(entry, is);
 	} else
-		log_w("cannot find background music");
+		log_w(_s("cannot find background music"));
 	return 0;
 }
 

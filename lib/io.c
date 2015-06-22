@@ -39,7 +39,7 @@ long long int fill_membuf(struct membuf *self, struct istream *istream)
 			tmp = b6_reallocate(self->allocator, self->buf,
 					    self->len);
 			if (!tmp) {
-				log_w("out of memory");
+				log_w(_s("out of memory"));
 				retval = -1;
 				break;
 			}
@@ -51,7 +51,7 @@ long long int fill_membuf(struct membuf *self, struct istream *istream)
 		self->off += retval;
 	}
 	if (retval < 0) {
-		log_w("error %d", retval);
+		logf_w("error %d", retval);
 		self->off = offset;
 	} else
 		retval = self->off - offset;
@@ -879,7 +879,7 @@ long long int pipe_streams(struct istream *i, struct ostream *o)
 	for (;;) {
 		long long int rsize = read_istream(i, buf, sizeof(buf));
 		if (rsize < 0) {
-			log_e("i/o read error #%lld", rsize);
+			logf_e("i/o read error #%lld", rsize);
 			return rsize;
 		}
 		if (!rsize)
@@ -888,7 +888,7 @@ long long int pipe_streams(struct istream *i, struct ostream *o)
 		while (rsize) {
 			long long int wsize = write_ostream(o, ptr, rsize);
 			if (wsize < 0) {
-				log_e("i/o write error #%lld", wsize);
+				logf_e("i/o write error #%lld", wsize);
 				return wsize;
 			}
 			rsize -= wsize;

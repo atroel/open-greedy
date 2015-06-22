@@ -67,7 +67,7 @@ static int initialize_sdl()
 	if (sdl_count++)
 		return 0;
 	if ((error = SDL_Init(0))) {
-		log_e("SDL_Init: %s\n.", SDL_GetError());
+		log_e(_s("SDL_Init: "), _s(SDL_GetError()));
 		sdl_count = 0;
 	}
 	return error;
@@ -91,7 +91,7 @@ static int initialize_sdl_video()
 	if (initialize_sdl())
 		return -1;
 	if (SDL_InitSubSystem(SDL_INIT_VIDEO)) {
-		log_e("%s", SDL_GetError());
+		log_e(_s(SDL_GetError()));
 		return -1;
 	}
 	return 0;
@@ -126,17 +126,17 @@ static int set_sdl_video_size(unsigned short int w, unsigned short int h)
 				w = mode.w;
 				h = mode.h;
 			} else
-				log_e("SDL_GetDesktopDisplayMode: %s",
-				      SDL_GetError());
+				log_e(_s("SDL_GetDesktopDisplayMode: "),
+				      _s(SDL_GetError()));
 		}
 	}
-	log_i("%ux%u", w, h);
+	logf_i("%ux%u", w, h);
 	window = SDL_CreateWindow("greedy",
 				  SDL_WINDOWPOS_CENTERED,
 				  SDL_WINDOWPOS_CENTERED,
 				  w, h, flags);
 	if (!window)
-		log_p("SDL_CreateWindow: %s", SDL_GetError());
+		log_p(_s("SDL_CreateWindow: "), _s(SDL_GetError()));
 	SDL_Delay(50);
 	return 0;
 }
@@ -462,7 +462,7 @@ static int open_sdl_renderer(struct sdl_renderer *self)
 	else if (vs == 1)
 		SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 	if (!(self->renderer = SDL_CreateRenderer(window, -1, 0))) {
-		log_e("%s", SDL_GetError());
+		log_e(_s(SDL_GetError()));
 		SDL_ClearHints();
 		return -1;
 	}
@@ -498,7 +498,7 @@ static int sdl_console_open(struct console *up)
 	}
 	up->default_renderer = &self->sdl_renderer.up;
 	if ((retval = get_sdl_video_size(&w, &h))) {
-		log_p("could not get video size");
+		log_p(_s("could not get video size"));
 		goto bail_out; /* NOT REACHED */
 	}
 	resize_renderer(up->default_renderer, w, h);
@@ -566,9 +566,9 @@ static int sdl_gl_console_open(struct console *up)
 	}
 	self->context = SDL_GL_CreateContext(window);
 	if (vsync >= 0 && SDL_GL_SetSwapInterval(vsync))
-		log_e("SDL_GL_SetSwapInterval(%d): %s", vsync, SDL_GetError());
+		logf_e("SDL_GL_SetSwapInterval(%d): %s", vsync, SDL_GetError());
 	if ((retval = get_sdl_video_size(&w, &h))) {
-		log_p("could not get video size");
+		log_p(_s("could not get video size"));
 		goto bail_out; /* NOT REACHED */
 	}
 	resize_renderer(up->default_renderer, w, h);
@@ -735,12 +735,12 @@ static int sdl_mixer_load_music(struct mixer *up, const char *path)
 	struct sdl_mixer *self = to_sdl_mixer(up);
 	int retval;
 	if (!(self->ctx = xmp_create_context())) {
-		log_e("xmp_create_context failed");
+		log_e(_s("xmp_create_context failed"));
 		return -1;
 	}
 	retval = xmp_load_module(self->ctx, (char*)path);
 	if (retval < 0)
-		log_e("xmp_load_module(%s): %d\n", path, retval);
+		logf_e("xmp_load_module(%s): %d\n", path, retval);
 	return retval;
 }
 
@@ -750,13 +750,13 @@ static int sdl_mixer_load_music_from_mem(struct mixer *up, const void *buf,
 	struct sdl_mixer *self = to_sdl_mixer(up);
 	int retval;
 	if (!(self->ctx = xmp_create_context())) {
-		log_e("xmp_create_context failed");
+		log_e(_s("xmp_create_context failed"));
 		return -1;
 	}
 	retval = xmp_load_module_from_memory(self->ctx, (void*)buf, len);
 	if (retval < 0) {
 		xmp_free_context(self->ctx);
-		log_e("xmp_load_module_from_memory: %d\n", retval);
+		logf_e("xmp_load_module_from_memory: %d", retval);
 	}
 	return retval;
 }
@@ -792,7 +792,7 @@ static void xmp_hook(void *cookie, Uint8 *stream, int len)
 {
 	int retval;
 	if ((retval = xmp_play_buffer(cookie, stream, len, 0)))
-		log_e("xmp_play_buffer: %d", retval);
+		logf_e("xmp_play_buffer: %d", retval);
 }
 
 static void sdl_mixer_play_music(struct mixer *up)
@@ -800,7 +800,7 @@ static void sdl_mixer_play_music(struct mixer *up)
 	struct sdl_mixer *self = to_sdl_mixer(up);
 	int retval;
 	if ((retval = xmp_start_player(self->ctx, 44100, 0)) < 0) {
-		log_e("xmp_start_player failed: %d", retval);
+		logf_e("xmp_start_player failed: %d", retval);
 		return;
 	}
 	SDL_LockAudio();
@@ -851,12 +851,12 @@ static int sdl_mixer_open(struct mixer *up)
 	if (initialize_sdl())
 		return -3;
 	if (SDL_InitSubSystem(SDL_INIT_AUDIO)) {
-		log_e("init failed", SDL_GetError());
+		log_e(_s("init failed: "), _s(SDL_GetError()));
 		return -1;
 	}
 	for (i = b6_card_of(self->channel); i--; self->channel[i] = 0);
 	if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 4096)) {
-		log_e("open failed: %s.", SDL_GetError());
+		log_e(_s("open failed: "), _s(SDL_GetError()));
 		SDL_QuitSubSystem(SDL_INIT_AUDIO);
 		return -2;
 	}

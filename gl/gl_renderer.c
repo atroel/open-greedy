@@ -357,10 +357,10 @@ int open_gl_renderer(struct gl_renderer *self)
 	self->root.renderer = &self->renderer;
 	self->dim = 1.f;
 	if (!initialize_gl_srv_buffer(&self->srv_buffer)) {
-		log_i("using remote gl buffer");
+		log_i(_s("using remote gl buffer"));
 		self->gl_buffer = &self->srv_buffer.gl_buffer;
 	} else if (!initialize_gl_cli_buffer(&self->cli_buffer)) {
-		log_i("using local gl buffer");
+		log_i(_s("using local gl buffer"));
 		self->gl_buffer = &self->cli_buffer.gl_buffer;
 	} else
 		return -1;
