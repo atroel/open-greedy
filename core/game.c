@@ -34,9 +34,9 @@ b6_flag(cheat, bool);
 	b6_notify_observers(&(_game)->observers, game_observer, _op, ##_args)
 
 #define __for_each_ghost(_self, _ghost) \
-	(void)((_self)==(struct game*)NULL); \
-	(void)((_ghost)==(struct ghost*)NULL); \
-	for (_ghost = (_self)->ghosts; \
+	for (_ghost = (_self)->ghosts, \
+	     (void)((_self)==(struct game*)NULL), \
+	     (void)((_ghost)==(struct ghost*)NULL); \
 	     _ghost < (_self)->ghosts + b6_card_of((_self)->ghosts); \
 	     _ghost += 1) \
 
