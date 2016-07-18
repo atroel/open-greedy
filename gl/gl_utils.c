@@ -155,7 +155,7 @@ int push_gl_srv_buffer(struct gl_buffer *gl_buffer)
 	if (size > self->size) {
 		logf_i("allocating %u bytes", size);
 		self->size = size;
-		if (self->id != ~0UL)
+		if (self->id != (GLuint)~0)
 			destroy_gl_buffer(self->id);
 		create_gl_buffer(&self->id);
 		bind_gl_buffer(self->id);
