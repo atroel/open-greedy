@@ -28,7 +28,7 @@ static void pacman_enter(struct mobile *mobile)
 void initialize_pacman(struct pacman *self, const struct b6_clock *clock,
 		       float speed, float booster)
 {
-	static const const struct mobile_ops ops = { .enter = pacman_enter, };
+	static const struct mobile_ops ops = { .enter = pacman_enter, };
 	initialize_mobile(&self->mobile, &ops, clock, speed);
 	self->score = 0;
 	self->booster = booster;

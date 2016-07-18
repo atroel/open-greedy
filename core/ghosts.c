@@ -465,7 +465,7 @@ static void ghost_enter(struct mobile *mobile)
 void initialize_ghost(struct ghost *self, int n, float speed,
 		      const struct b6_clock *clock)
 {
-	static const const struct mobile_ops ops = { .enter = ghost_enter, };
+	static const struct mobile_ops ops = { .enter = ghost_enter, };
 	initialize_mobile(&self->mobile, &ops, clock, speed);
 	switch (n) {
 	case 0:
