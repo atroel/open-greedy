@@ -124,12 +124,6 @@ static unsigned long long int get_cartoon_duration(const struct cartoon *self)
 	return self->period * self->length;
 }
 
-static inline int cartoon_is_done(const struct cartoon *self,
-				  unsigned long long int now)
-{
-	return !self->loop && now - self->time > get_cartoon_duration(self);
-}
-
 static struct renderer_texture *get_cartoon_image(const struct cartoon *self,
 						  unsigned long long int now)
 {
