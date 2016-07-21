@@ -1,7 +1,7 @@
 /*
  * Open Greedy - an open-source version of Edromel Studio's Greedy XP
  *
- * Copyright (C) 2014-2015 Arnaud TROEL
+ * Copyright (C) 2014-2016 Arnaud TROEL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

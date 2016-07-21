@@ -1,7 +1,7 @@
 /*
  * Open Greedy - an open-source version of Edromel Studio's Greedy XP
  *
- * Copyright (C) 2014-2015 Arnaud TROEL
+ * Copyright (C) 2014-2016 Arnaud TROEL
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -184,7 +184,7 @@ static int greedy(struct b6_clock *clock)
 	struct preferences preferences;
 	struct engine engine;
 	struct b6_utf8 utf8;
-	puts("Open Greedy - Copyright (C) 2014-2015 Arnaud TROEL");
+	puts("Open Greedy - Copyright (C) 2014-2016 Arnaud TROEL");
 	puts("This program comes with ABSOLUTELY NO WARRANTY.");
 	puts("This is free software, and you are welcome to redistribute it");
 	puts("under certain conditions; see COPYING file for details.");
