@@ -143,6 +143,7 @@ int initialize_ofstream_with_fd(struct ofstream *self, int fd, int is_owner)
 int initialize_ofstream(struct ofstream *self, const char *filename)
 {
 	self->ostream.ops = &ofstream_ops;
+	self->is_owner = 1;
 	return (self->fp = fopen(filename, "wb")) ? 0 : -1;
 }
 
