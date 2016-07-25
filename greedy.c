@@ -62,7 +62,7 @@ b6_flag(game, string);
 static const char *mode = NULL;
 b6_flag(mode, string);
 
-const char *lang = NULL;
+static const char *lang = NULL;
 b6_flag(lang, string);
 
 /* ascii to lev */
