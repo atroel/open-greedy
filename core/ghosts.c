@@ -191,15 +191,6 @@ static struct astar_node *coords_to_node(int x, int y, struct astar_node *nodes)
 	return &nodes[x + y * LEVEL_WIDTH];
 }
 
-static struct astar_node *place_to_node(struct place *place,
-					struct astar_node *nodes,
-					struct level *level)
-{
-	int x, y;
-	place_location(level, place, &x, &y);
-	return coords_to_node(x, y, nodes);
-}
-
 static unsigned int get_shortest_distance(const struct level *level,
 					  int xs, int ys, int xd, int yd)
 {
@@ -226,18 +217,15 @@ static int get_astar_distance(struct level *level, const struct items *items,
 			      unsigned short int xd, unsigned short int yd)
 {
 	int retval = -1;
-	struct astar_node nodes[LEVEL_WIDTH * LEVEL_HEIGHT];
+	struct astar_node nodes[b6_card_of(level->places)];
 	struct astar_node *goal, *curr;
 	struct b6_array array;
 	struct b6_heap queue;
-	struct level_iterator i;
+	unsigned int i;
 	b6_array_initialize(&array, &b6_std_allocator,
 			    sizeof(struct astar_node*));
 	b6_heap_reset(&queue, &array, astar_node_compare, astar_node_set_index);
-	initialize_level_iterator(&i, level);
-	while (level_iterator_has_next(&i))
-		reset_astar_node(place_to_node(level_iterator_next(&i), nodes,
-					       level));
+	for (i = 0; i < b6_card_of(nodes); i += 1) reset_astar_node(&nodes[i]);
 	goal = coords_to_node(xd, yd, nodes);
 	curr = coords_to_node(xs, ys, nodes);
 	open_astar_node(curr, 0, get_shortest_distance(level, xs, ys, xd, yd));
