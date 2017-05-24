@@ -179,18 +179,6 @@ static void astar_node_set_index(void *ptr, unsigned long int r)
 	((struct astar_node*)ptr)->r = r;
 }
 
-static struct place *node_to_place(struct astar_node* node,
-				   struct astar_node *nodes,
-				   struct level *level)
-{
-	return &level->places[node - nodes];
-}
-
-static struct astar_node *coords_to_node(int x, int y, struct astar_node *nodes)
-{
-	return &nodes[x + y * LEVEL_WIDTH];
-}
-
 static unsigned int get_shortest_distance(const struct level *level,
 					  int xs, int ys, int xd, int yd)
 {
@@ -212,36 +200,125 @@ static unsigned int get_shortest_distance(const struct level *level,
 	return d;
 }
 
+struct astar {
+	struct astar_node nodes[b6_card_of(((struct level*)NULL)->places)];
+	struct b6_array array;
+	struct b6_heap queue;
+};
+
+void initialize_astar(struct astar *self)
+{
+	int i;
+	b6_array_initialize(&self->array, &b6_std_allocator,
+			    sizeof(struct astar_node*));
+	b6_heap_reset(&self->queue, &self->array, astar_node_compare,
+		      astar_node_set_index);
+	for (i = 0; i < b6_card_of(self->nodes); i += 1)
+		reset_astar_node(&self->nodes[i]);
+}
+
+void finalize_astar(struct astar *self)
+{
+	b6_array_finalize(&self->array);
+}
+
+static int is_legal_astar_node(const struct astar *self,
+			       const struct astar_node *node)
+{
+	return node >= self->nodes &&
+		node < self->nodes + b6_card_of(self->nodes);
+}
+
+static struct astar_node *coords_to_astar_node(const struct astar *self,
+					       int x, int y)
+{
+	const struct astar_node *node = &self->nodes[x + y * LEVEL_WIDTH];
+	if (b6_unlikely(!is_legal_astar_node(self, node)))
+		return NULL;
+	return (struct astar_node*)node;
+}
+
+static struct place *astar_node_to_place(const struct astar *self,
+					 const struct astar_node *node,
+					 struct level *level)
+{
+	struct place *place = &level->places[node - self->nodes];
+	if (b6_unlikely(place < level->places ||
+			place >= level->places + b6_card_of(level->places))) {
+		log_e(_s("cannot convert astar node to level place"));
+		return NULL;
+	}
+	if (b6_unlikely(!place->item)) {
+		log_e(_s("unreachable astar node place"));
+		return NULL;
+	}
+	return place;
+}
+
+static int push_astar_node(struct astar *self, struct astar_node *node)
+{
+	int retval = b6_heap_push(&self->queue, node);
+	if (b6_unlikely(retval))
+		log_e(_s("astar oom"));
+	return retval;
+}
+
+static struct astar_node* pop_astar_node(struct astar *self)
+{
+	struct astar_node *node;
+	if (b6_unlikely(b6_heap_empty(&self->queue))) {
+		log_e(_s("empty astar heap"));
+		return NULL;
+	}
+	node = b6_heap_top(&self->queue);
+	if (b6_unlikely(!is_legal_astar_node(self, node))) {
+		log_e(_s("illegal top astar node"));
+		return NULL;
+	}
+	return node;
+}
+
+static int touch_astar_node(struct astar *self, struct astar_node *node)
+{
+	if (b6_unlikely(node->r >= b6_array_length(self->queue.array))) {
+		log_e(_s("cannot touch astar node"));
+		return -1;
+	}
+	b6_heap_touch(&self->queue, node->r);
+	return 0;
+}
+
 static int get_astar_distance(struct level *level, const struct items *items,
 			      unsigned short int xs, unsigned short int ys,
 			      unsigned short int xd, unsigned short int yd)
 {
-	int retval = -1;
-	struct astar_node nodes[b6_card_of(level->places)];
+	struct astar astar;
 	struct astar_node *goal, *curr;
-	struct b6_array array;
-	struct b6_heap queue;
-	unsigned int i;
-	b6_array_initialize(&array, &b6_std_allocator,
-			    sizeof(struct astar_node*));
-	b6_heap_reset(&queue, &array, astar_node_compare, astar_node_set_index);
-	for (i = 0; i < b6_card_of(nodes); i += 1) reset_astar_node(&nodes[i]);
-	goal = coords_to_node(xd, yd, nodes);
-	curr = coords_to_node(xs, ys, nodes);
+	initialize_astar(&astar);
+	if (b6_unlikely(!(goal = coords_to_astar_node(&astar, xd, yd)))) {
+		log_e(_s("illegal astar target"));
+		return -1;
+	}
+	if (b6_unlikely(!(curr = coords_to_astar_node(&astar, xs, ys)))) {
+		log_e(_s("illegal astar source"));
+		return -1;
+	}
 	open_astar_node(curr, 0, get_shortest_distance(level, xs, ys, xd, yd));
-	b6_heap_push(&queue, curr);
-	do {
+	if (b6_unlikely(push_astar_node(&astar, curr)))
+		return -1;
+	for (;;) {
 		struct place *place;
 		unsigned short int f, g;
 		enum direction d;
-		curr = b6_heap_top(&queue);
-		if (curr == goal) {
-			retval = goal->f;
+		curr = pop_astar_node(&astar);
+		if (b6_unlikely(curr))
+			return -1;
+		if (curr == goal)
 			break;
-		}
-		b6_heap_pop(&queue);
 		close_astar_node(curr);
-		place = node_to_place(curr, nodes, level);
+		place = astar_node_to_place(&astar, curr, level);
+		if (b6_unlikely(!place))
+			return -1;
 		g = 1 + curr->g;
 		for_each_direction(d) {
 			struct place *n = place_neighbor(level, place, d);
@@ -252,13 +329,14 @@ static int get_astar_distance(struct level *level, const struct items *items,
 			if (is_teleport(items, n->item))
 				n = get_teleport_destination(n->item);
 			place_location(level, n, &x, &y);
-			node = coords_to_node(x, y, nodes);
+			node = coords_to_astar_node(&astar, x, y);
 			if (astar_node_is_closed(node) && g >= node->g)
 				continue;
 			if (!astar_node_is_open(node)) {
 				open_astar_node(node, g, get_shortest_distance(
 						level, x, y, xd, yd));
-				b6_heap_push(&queue, node);
+				if (b6_unlikely(push_astar_node(&astar, node)))
+					return -1;
 				continue;
 			}
 			if (g >= node->g)
@@ -269,16 +347,17 @@ static int get_astar_distance(struct level *level, const struct items *items,
 				continue;
 			}
 			if (node->f < f) {
-				logf_w("%u < %u", node->f, f);
+				logf_w("astar glitch: %u < %u", node->f, f);
 				continue;
 			}
 			node->g = g;
 			node->f = f;
-			b6_heap_touch(&queue, node->r);
+			if (b6_unlikely(touch_astar_node(&astar, node)))
+				return -1;
 		}
-	} while (!b6_heap_empty(&queue));
-	b6_array_finalize(&array);
-	return retval;
+	}
+	finalize_astar(&astar);
+	return goal->f;
 }
 
 static float get_no_score(struct ghost_strategy *self, struct ghost *ghost,
