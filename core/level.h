@@ -169,6 +169,11 @@ struct level {
 	struct items *items;
 };
 
+static inline int is_place(const struct level *l, const struct place *p)
+{
+	return p >= l->places && p < l->places + b6_card_of(l->places);
+}
+
 static inline void place_location(const struct level *l, const struct place *p,
 				  int *x, int *y)
 {

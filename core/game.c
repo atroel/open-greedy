@@ -298,14 +298,36 @@ static void touch_level(struct game *self, struct place *place,
 	__notify_game_observers(self, on_level_touch, place, item);
 }
 
+
 static void eat_pacgum(struct game *self, struct place *place,
 		       struct item *item)
 {
 	if (get_next_ops(self) == &leave_ops)
 		return;
+	if (b6_unlikely(!is_pacgum_item(&self->items, item))) {
+		log_e(_s("unexpected item; wanted pacgum"));
+		return;
+	}
 	touch_level(self, place, clone_empty(self->level.items));
 	if (game_level_completed(self))
 		game_passed(self);
+}
+
+static int is_pacman(const struct game *self, const struct mobile* mobile)
+{
+	int retval = &self->pacman.mobile == mobile;
+	if (b6_unlikely(!retval))
+		log_e(_s("unexpected mobile; wanted pacman"));
+	return retval;
+}
+
+static int is_ghost(const struct game *self, const struct ghost* ghost)
+{
+	int retval = ghost == &self->ghosts[0] || ghost == &self->ghosts[1] ||
+		ghost == &self->ghosts[2] || ghost == &self->ghosts[3];
+	if (b6_unlikely(!retval))
+		log_e(_s("unexpected mobile; wanted ghost"));
+	return retval;
 }
 
 static void ghost_eats_pacgum(struct item_observer *observer,
@@ -314,6 +336,8 @@ static void ghost_eats_pacgum(struct item_observer *observer,
 {
 	struct game *self = b6_cast_of(observer, struct game, pacgum);
 	struct ghost *ghost = b6_cast_of(mobile, struct ghost, mobile);
+	if (b6_unlikely(!is_ghost(self, ghost)))
+		return;
 	if (game_event_is_pending(&self->banquet) && ghost_is_alive(ghost))
 		eat_pacgum(self, mobile->curr, item);
 }
@@ -323,6 +347,8 @@ static void pacman_eats_pacgum(struct item_observer *observer,
 			       struct item *item)
 {
 	struct game *self = b6_cast_of(observer, struct game, pacgum);
+	if (b6_unlikely(!is_pacman(self, mobile)))
+		return;
 	if (!game_event_is_pending(&self->diet)) {
 		increase_game_score(self, self->pacgum_score);
 		eat_pacgum(self, mobile->curr, item);
@@ -335,16 +361,48 @@ static void pacman_eats_super_pacgum(struct item_observer *observer,
 {
 	struct game *self = b6_cast_of(observer, struct game, super_pacgum);
 	struct place *place = mobile->curr;
+	if (b6_unlikely(!is_pacman(self, mobile)))
+		return;
+	if (b6_unlikely(!is_super_pacgum_item(&self->items, item))) {
+		log_e(_s("unexpected item; wanted super pacgum"));
+		return;
+	}
 	touch_level(self, place, clone_empty(self->level.items));
 	enable_super_pacgum(self);
 }
 
-static void mobile_enters_teleport(struct item_observer *observer,
+static void mobile_enters_teleport(struct game *self,
 				   struct mobile *mobile,
-				   struct item *item)
+				   struct teleport *t)
 {
-	mobile->curr = get_teleport_destination(item);
+	struct place *place = get_teleport_destination(&t->item);
+	if (b6_unlikely(!is_teleport(&self->items, &t->item))) {
+		log_e(_s("unexpected item; wanted teleport"));
+		return;
+	}
+	if (b6_unlikely(!is_teleport(&self->items, &t->teleport->item))) {
+		log_e(_s("unexpected item; wanted second teleport"));
+		return;
+	}
+	if (b6_unlikely(!is_place(&self->level, place))) {
+		log_e(_s("unexpected teleport destination"));
+		return;
+	}
+	mobile->curr = place;
 	mobile->next = NULL;
+}
+
+static void ghost_enters_teleport(struct item_observer *observer,
+				  struct mobile *mobile,
+				  struct item *item)
+{
+	struct teleport *t = b6_cast_of(item, struct teleport, item);
+	struct teleport *s = t->teleport;
+	struct game *self = b6_cast_of(observer, struct game, teleport[t > s]);
+	struct ghost *ghost = b6_cast_of(mobile, struct ghost, mobile);
+	if (b6_unlikely(!is_ghost(self, ghost)))
+		return;
+	mobile_enters_teleport(self, mobile, t);
 }
 
 static void pacman_enters_teleport(struct item_observer *observer,
@@ -354,7 +412,9 @@ static void pacman_enters_teleport(struct item_observer *observer,
 	struct teleport *t = b6_cast_of(item, struct teleport, item);
 	struct teleport *s = t->teleport;
 	struct game *self = b6_cast_of(observer, struct game, teleport[t > s]);
-	mobile_enters_teleport(observer, mobile, item);
+	if (b6_unlikely(!is_pacman(self, mobile)))
+		return;
+	mobile_enters_teleport(self, mobile, t);
 	__notify_game_observers(self, on_teleport);
 }
 
@@ -749,6 +809,10 @@ static void pacman_catches_bonus(struct item_observer *observer,
 				 struct mobile *mobile, struct item *item)
 {
 	struct game *self = b6_cast_of(observer, struct game, bonus);
+	if (b6_unlikely(!is_bonus_item(&self->items, item))) {
+		log_e(_s("unexpected item; wanted bonus"));
+		return;
+	}
 	activate_bonus(self, unveil_bonus_contents(item));
 	defer_game_event(&self->bonus_disabled, 0);
 }
@@ -789,6 +853,8 @@ void abort_game(struct game *self)
 static void pacman_eats_ghost(struct game *self, struct ghost *ghost)
 {
 	int i = ghost - self->ghosts;
+	if (b6_unlikely(!is_ghost(self, ghost)))
+		return;
 	if (game_event_is_pending(&self->ghosts_recovering) ||
 	    game_event_is_pending(&self->zzz_recovering) ||
 	    self->ghost_score > self->config->ghost_score_limit)
@@ -1184,7 +1250,7 @@ int initialize_game(struct game *self,
 	};
 	static const struct item_observer_ops teleport_ops = {
 		.on_pacman_visit = pacman_enters_teleport,
-		.on_ghost_visit = mobile_enters_teleport,
+		.on_ghost_visit = ghost_enters_teleport,
 	};
 	struct ghost *ghost;
 	int i;
