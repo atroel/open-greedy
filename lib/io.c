@@ -27,6 +27,9 @@
 #if WITH_LZO
 #include <lzo/lzo1x.h>
 #endif
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 long long int fill_membuf(struct membuf *self, struct istream *istream)
 {
@@ -108,9 +111,31 @@ int initialize_ifstream_with_fp(struct ifstream *self, FILE *fp, int is_owner)
 	return 0;
 }
 
+static FILE *platform_fopen(const char *path, const char *mode)
+{
+#ifndef _WIN32
+	return fopen(path, mode);
+#else
+	wchar_t w_path[MAX_PATH];
+	wchar_t w_mode[128];
+	size_t len;
+	len = strlen(path);
+	len = MultiByteToWideChar(CP_UTF8, 0, path, len, w_path, len);
+	if (!len || len >= b6_card_of(w_path))
+		return NULL;
+	w_path[len] = L'\0';
+	len = strlen(mode);
+	len = MultiByteToWideChar(CP_UTF8, 0, mode, len, w_mode, len);
+	if (!len || len >= b6_card_of(w_mode))
+		return NULL;
+	w_mode[len] = L'\0';
+	return _wfopen(w_path, w_mode);
+#endif
+}
+
 int initialize_ifstream(struct ifstream *self, const char *filename)
 {
-	FILE *fp = fopen(filename, "rb");
+	FILE *fp = platform_fopen(filename, "rb");
 	if (!fp)
 		return -1;
 	setup_ifstream(self, fp, 0, 1);
@@ -142,9 +167,13 @@ int initialize_ofstream_with_fd(struct ofstream *self, int fd, int is_owner)
 
 int initialize_ofstream(struct ofstream *self, const char *filename)
 {
+	FILE *fp = platform_fopen(filename, "wb");
+	if (fp == NULL)
+		return -1;
 	self->ostream.ops = &ofstream_ops;
 	self->is_owner = 1;
-	return (self->fp = fopen(filename, "wb")) ? 0 : -1;
+	self->fp = fp;
+	return 0;
 }
 
 void finalize_ifstream(struct ifstream *self)

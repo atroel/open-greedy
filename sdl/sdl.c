@@ -49,9 +49,25 @@ b6_flag(sdl_sleep, uint);
 static Uint32 flags = SDL_WINDOW_RESIZABLE;
 
 static int sdl_count = 0;
-
+static char sdl_rw_dir[1024];
 static const struct b6_utf8 sdl_utf8 = B6_DEFINE_UTF8("sdl");
 static const struct b6_utf8 sdl_gl_utf8 = B6_DEFINE_UTF8("sdl/gl");
+
+const char *get_platform_rw_dir(void)
+{
+	return SDL_GetPrefPath(".", "opengreedy");
+}
+
+static int initialize_sdl_rw_dir(char *pref_path)
+{
+	sdl_rw_dir[sizeof(sdl_rw_dir) - 1] = '\0';
+	strncpy(sdl_rw_dir, pref_path, sizeof(sdl_rw_dir));
+	if (sdl_rw_dir[sizeof(sdl_rw_dir) - 1] != '\0') {
+		log_e(_s("cannot copy path: "), _s(pref_path));
+		return -1;
+	}
+	return 0;
+}
 
 static void finalize_sdl()
 {
@@ -69,6 +85,12 @@ static int initialize_sdl()
 	if ((error = SDL_Init(0))) {
 		log_e(_s("SDL_Init: "), _s(SDL_GetError()));
 		sdl_count = 0;
+	} else {
+		char *ptr = SDL_GetPrefPath(".", "opengreedy");
+		error = initialize_sdl_rw_dir(ptr);
+		SDL_free(ptr);
+		if (error)
+			finalize_sdl();
 	}
 	return error;
 }
@@ -937,9 +959,4 @@ void register_sdl_clock_source(void)
 	static struct b6_clock sdl_clock = { .ops = &sdl_clock_ops, };
 	static struct b6_named_clock sdl_named_clock = { .clock = &sdl_clock, };
 	b6_register_named_clock(&sdl_named_clock, &sdl_utf8);
-}
-
-const char *get_platform_rw_dir(void)
-{
-	return SDL_GetPrefPath(".", "opengreedy");
 }
