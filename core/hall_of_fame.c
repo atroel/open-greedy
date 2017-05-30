@@ -26,7 +26,6 @@
 #include "json.h"
 #include "lib/io.h"
 #include "lib/log.h"
-#include "lib/rng.h"
 #include "lib/std.h"
 
 static const struct b6_utf8 label_key = B6_DEFINE_UTF8("label");
@@ -121,32 +120,58 @@ static int comp_entries(const struct b6_json_object *lhs,
 static void sort_entries(struct b6_json_array *array,
 			 unsigned int i, unsigned int n)
 {
-	struct b6_json_object *obj[2];
-	if (n > 2) {
-		unsigned int k, j = i + read_random_number_generator() * n;
-		if (j > i)
-			swap_entries(array, i, j);
-		obj[0] = b6_json_get_array_as(array, j, object);
-		j = i + 1;
-		k = i + n - 1;
-		for (;;) {
-			obj[1] = b6_json_get_array_as(array, k, object);
-			if (comp_entries(obj[0], obj[1]) > 0) {
-				unsigned int l = j;
-				if (j++ >= k)
-					break;
-				swap_entries(array, l, k);
-			} else if (j >= --k)
-				break;
-		}
-		k = j - i;
-		sort_entries(array, i, k);
-		sort_entries(array, j, n - k);
-	} else if (n == 2) {
-		obj[0] = b6_json_get_array_as(array, i, object);
-		obj[1] = b6_json_get_array_as(array, i + 1, object);
-		if (comp_entries(obj[0], obj[1]) > 0)
+	struct b6_json_object *o[3];
+	unsigned int j, k;
+again:
+	if (n < 2)
+		return;
+	if (n == 2) {
+		o[0] = b6_json_get_array_as(array, i, object);
+		o[1] = b6_json_get_array_as(array, i + 1, object);
+		if (comp_entries(o[0], o[1]) > 0)
 			swap_entries(array, i, i + 1);
+		return;
+	}
+	k = i - 1 + n;
+	j = i + (k - i) / 2;
+	o[0] = b6_json_get_array_as(array, i, object);
+	o[1] = b6_json_get_array_as(array, j, object);
+	o[2] = b6_json_get_array_as(array, k, object);
+	if (comp_entries(o[0], o[1]) < 0) {
+		if (comp_entries(o[1], o[2]) < 0)
+			swap_entries(array, i, j);
+		else if (comp_entries(o[0], o[2]) < 0)
+			swap_entries(array, i, k);
+	} else {
+		if (comp_entries(o[1], o[2]) > 0)
+			swap_entries(array, i, j);
+		else if (comp_entries(o[0], o[2]) > 0)
+			swap_entries(array, i, k);
+	}
+	o[0] = b6_json_get_array_as(array, i, object);
+	for (j = i - 1, k = i + n;;) {
+		do
+			o[1] = b6_json_get_array_as(array, ++j, object);
+		while (comp_entries(o[0], o[1]) > 0);
+		do
+			o[1] = b6_json_get_array_as(array, --k, object);
+		while (comp_entries(o[0], o[1]) < 0);
+		if (j >= k)
+			break;
+		swap_entries(array, j, k);
+	}
+	k = j - i;
+	if (k >= n - k) {
+		if (n - k > 1)
+			sort_entries(array, j, n - k);
+		n = k;
+		goto again;
+	} else {
+		if (k > 1)
+			sort_entries(array, i, k);
+		i = j;
+		n -= k;
+		goto again;
 	}
 }
 
