@@ -19,11 +19,11 @@ Minimum version: 1.0
 Static libraries
 
 Extended module player library lite - http://xmp.sourceforge.net/
-Minimum version: 4.3.3
+Minimum version: 4.4.1
 License: MIT (Expat)
 
 Basics - https://github.com/atroel/basics/
-Minimum version: 0.3
+Minimum version: 0.5
 License: 2-clause BSD
 
 Download and build the static libraries beforehand.  Adapt Build.mk accordingly.
