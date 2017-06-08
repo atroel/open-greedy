@@ -57,10 +57,46 @@ void clear_rgba(struct rgba *self, unsigned int color)
 	while (i--) *p++ = color;
 }
 
-void copy_rgba(const struct rgba *src,
-	       unsigned short int x, unsigned short int y,
-	       unsigned short int w, unsigned short int h,
-	       struct rgba *dst, unsigned short int u, unsigned short int v)
+static int clip_rgba(unsigned short int *x, unsigned short int *y,
+		     unsigned short int *w, unsigned short int *h,
+		     unsigned short int u, unsigned short int v,
+		     unsigned short int p, unsigned short int q)
+{
+	unsigned long int d;
+	if (*x < u) {
+		d = u - *x;
+		if (d >= *w)
+			return 0;
+		*x = u;
+		*w -= d;
+	}
+	d = *x - u;
+	if (d >= p)
+		return 0;
+	d = p - d;
+	if (*w > d)
+		*w = d;
+	if (*y < v) {
+		d = v - *y;
+		if (d >= *h)
+			return 0;
+		*y = v;
+		*h -= d;
+	}
+	d = *y - v;
+	if (d >= q)
+		return 0;
+	d = q - d;
+	if (*h > d)
+		*h = d;
+	return 1;
+}
+
+static void do_copy_rgba(const struct rgba *src,
+			 unsigned short int x, unsigned short int y,
+			 unsigned short int w, unsigned short int h,
+			 struct rgba *dst,
+			 unsigned short int u, unsigned short int v)
 {
 	const unsigned char *s = &src->p[4 * (x + y * src->w)];
 	unsigned char *d = &dst->p[4 * (u + v * dst->w)];
@@ -69,6 +105,17 @@ void copy_rgba(const struct rgba *src,
 		s += 4 * src->w;
 		d += 4 * dst->w;
 	}
+}
+
+void copy_rgba(const struct rgba *src,
+	       unsigned short int x, unsigned short int y,
+	       unsigned short int w, unsigned short int h,
+	       struct rgba *dst, unsigned short int u, unsigned short int v)
+{
+	unsigned short int p = u, q = v;
+	if (clip_rgba(&x, &y, &w, &h, 0, 0, src->w, src->h) &&
+	    clip_rgba(&u, &v, &w, &h, 0, 0, dst->w, dst->h))
+		do_copy_rgba(src, x + u - p, y + v - q, w, h, dst, p, q);
 }
 
 void make_shadow_rgba(struct rgba *rgba)

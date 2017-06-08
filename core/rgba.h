@@ -43,7 +43,7 @@ extern void clear_rgba(struct rgba *self, unsigned int color);
 
 extern int write_rgba_as_tga(const struct rgba *rgba, struct ostream *ostream);
 
-/* silly blit: no crop, no wrap test, no overlap test. */
+/* clipped blit without overlap test. */
 extern void copy_rgba(const struct rgba *from,
 		      unsigned short int x, unsigned short int y,
 		      unsigned short int w, unsigned short int h,
